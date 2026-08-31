@@ -49,6 +49,20 @@ if [ ! -f "$OPENTUI_ZIG_DIR/build.zig" ]; then
     exit 1
 fi
 
+# Android (bionic) has dl and pthread inside libc — there are no separate
+# libdl.so/libpthread.so for zig to find, and linking them fails with
+# "unable to find dynamic system library". Guard the linux branch so they
+# are only linked on non-android linux. We only ever build android here,
+# so wrap the two linkSystemLibrary calls in the .linux switch branch.
+if grep -q 'artifact.linkSystemLibrary("dl");' "$OPENTUI_ZIG_DIR/build.zig"; then
+    echo ">>> Guarding dl/pthread link calls for Android (bionic has them in libc)..."
+    sed -i \
+        -e 's|artifact.linkSystemLibrary("dl");|{ if (!target.result.abi.isAndroid()) { artifact.linkSystemLibrary("dl");|' \
+        -e 's|artifact.linkSystemLibrary("pthread");|artifact.linkSystemLibrary("pthread"); } }|2' \
+        "$OPENTUI_ZIG_DIR/build.zig"
+    echo "    Done."
+fi
+
 echo ">>> Building with Zig (target: aarch64-linux-android)..."
 cd "$OPENTUI_ZIG_DIR"
 
