@@ -57,8 +57,8 @@ fi
 if grep -q 'artifact.linkSystemLibrary("dl");' "$OPENTUI_ZIG_DIR/build.zig"; then
     echo ">>> Guarding dl/pthread link calls for Android (bionic has them in libc)..."
     sed -i \
-        -e 's|artifact.linkSystemLibrary("dl");|{ if (!target.result.abi.isAndroid()) { artifact.linkSystemLibrary("dl");|' \
-        -e 's|artifact.linkSystemLibrary("pthread");|artifact.linkSystemLibrary("pthread"); } }|2' \
+        -e 's|artifact.linkSystemLibrary("dl");|{ if (!target.result.abi.isAndroid()) { artifact.linkSystemLibrary("dl"); artifact.linkSystemLibrary("pthread"); } }|' \
+        -e '/^            artifact.linkSystemLibrary("pthread");$/d' \
         "$OPENTUI_ZIG_DIR/build.zig"
     echo "    Done."
 fi
