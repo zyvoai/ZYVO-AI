@@ -53,7 +53,20 @@ fi
 # ---------------------------------------------------------------
 info "Looking up the latest Android build in ${GITHUB_REPO}..."
 API_URL="https://api.github.com/repos/${GITHUB_REPO}/releases/latest"
-RELEASE_JSON="$(curl -fsSL "$API_URL")" || die "Could not reach GitHub API. Check your internet connection."
+TMP_JSON="$(mktemp)"
+HTTP_CODE="$(curl -sSL -o "$TMP_JSON" -w '%{http_code}' "$API_URL" || echo 000)"
+if [ "$HTTP_CODE" = "404" ]; then
+  rm -f "$TMP_JSON"
+  die "No release published yet in ${GITHUB_REPO}.
+The Android build has not finished (or has not been run).
+Open the repo's Actions tab on github.com and run 'Build OpenCode for
+Android/Termux (aarch64)', wait for it to finish, then try again."
+elif [ "$HTTP_CODE" != "200" ]; then
+  rm -f "$TMP_JSON"
+  die "GitHub API returned HTTP $HTTP_CODE. Check your internet connection."
+fi
+RELEASE_JSON="$(cat "$TMP_JSON")"
+rm -f "$TMP_JSON"
 
 ASSET_URL="$(echo "$RELEASE_JSON" | grep -o "\"browser_download_url\": *\"[^\"]*${ASSET_PATTERN}\"" | head -1 | grep -o 'https[^"]*')"
 [ -n "$ASSET_URL" ] || die "No ${ASSET_PATTERN} asset found in the latest release of ${GITHUB_REPO}.
