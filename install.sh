@@ -35,11 +35,6 @@ case "$(uname -m)" in
   *) die "Unsupported architecture: $(uname -m). Currently only aarch64 (64-bit ARM) phones are supported." ;;
 esac
 
-if [ "$GITHUB_REPO" = "zyvoai/zyvo" ]; then
-  die "Repository not configured. Run:  bash install.sh zyvoai/zyvo
-       (replace zyvoai/zyvo with the GitHub repo this file lives in)"
-fi
-
 command -v curl >/dev/null 2>&1 || { info "Installing curl..."; pkg install -y curl; }
 command -v unzip >/dev/null 2>&1 || { info "Installing unzip..."; pkg install -y unzip; }
 

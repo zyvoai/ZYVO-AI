@@ -61,10 +61,15 @@ jobs:
 
       - name: Create swap
         run: |
-          sudo fallocate -l 10G /swapfile
-          sudo chmod 600 /swapfile
-          sudo mkswap /swapfile
-          sudo swapon /swapfile
+          if swapon --show | grep -q .; then
+            echo "Swap already active on this runner:"
+            swapon --show
+          else
+            sudo fallocate -l 10G /swapfile
+            sudo chmod 600 /swapfile
+            sudo mkswap /swapfile
+            sudo swapon /swapfile
+          fi
           free -h
 
       - name: Create work directory
