@@ -55,11 +55,12 @@ cd "$OPENCODE_PKG"
 "$HOST_BUN" install --os='*' --cpu='*' @parcel/watcher@2.5.1
 "$HOST_BUN" install --os='*' --cpu='*' @ff-labs/fff-bun@0.9.4
 
-# Find the Android bun binary
-ANDROID_BUN="$BUN_BUILD/bun"
+# Find the Android bun binary (prebuilt runtime from guysoft release,
+# downloaded into $PREBUILT_DIR by the workflow / download-prebuilt.sh)
+ANDROID_BUN="$PREBUILT_DIR/opencode.bin"
 if [ ! -f "$ANDROID_BUN" ]; then
     echo "ERROR: Android bun binary not found at $ANDROID_BUN"
-    echo "       Run scripts/build-bun.sh first."
+    echo "       Download the prebuilt runtime first (PREBUILT_URL)."
     exit 1
 fi
 
@@ -105,6 +106,16 @@ fi
 
 # Create dist directory
 mkdir -p "$DIST_DIR"
+
+# Ship the prebuilt runtime files alongside our binary: the standalone binary
+# re-executes the plain android bun for worker processes (opencode.bin), and
+# its runtime .so dependencies must live in $PREFIX/lib on the phone.
+if [ -d "$PREBUILT_DIR" ]; then
+    for f in "$PREBUILT_DIR"/*.so; do
+        [ -f "$f" ] && cp "$f" "$DIST_DIR/"
+    done
+    [ -f "$PREBUILT_DIR/opencode.bin" ] && cp "$PREBUILT_DIR/opencode.bin" "$DIST_DIR/"
+fi
 
 # Run the TypeScript build script
 # Copy it into the OpenCode package tree so Bun can resolve @opentui/solid/bun-plugin

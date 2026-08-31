@@ -1,9 +1,15 @@
 name: Build OpenCode for Android/Termux (aarch64)
 
-# Builds a native Android (bionic) standalone binary of OpenCode so it can
-# run directly in Termux — no proot, no glibc layer.
-# Build system vendored from guysoft/opencode-termux (MIT), adapted for
-# opencode v1.18.x (Bun 1.3.11, last cmake-era Bun).
+# Builds our customized OpenCode as a native Android (bionic) standalone
+# binary for Termux — no proot, no glibc layer.
+#
+# Strategy: instead of cross-compiling Bun/WebKit/ICU ourselves (2-3h, fragile
+# patches), we reuse the PROVEN prebuilt Android runtime (opencode.bin + .so)
+# published by guysoft/opencode-termux v0.2.1 — which demonstrably runs
+# opencode 1.17.9 — and build only:
+#   1. libopentui.so (OpenTUI v0.4.5, matching @opentui/core 0.4.5)
+#   2. our OpenCode source bundled as a module graph appended to that runtime
+# Build takes ~10-20 minutes.
 
 on:
   workflow_dispatch:
@@ -11,23 +17,18 @@ on:
       opencode_version:
         description: 'OpenCode version to build'
         required: false
-        default: '1.18.25'
+        default: '1.17.9'
   push:
     tags:
       - 'android-v*'
 
 env:
-  BUN_VERSION: "1.2.13"
+  OPENCODE_VERSION: "1.17.9"
   HOST_BUN_VERSION: "1.3.2"
-  OPENCODE_VERSION: "1.18.25"
   OPENTUI_TAG: "v0.4.5"
-  ANDROID_API: "24"
-  WEBKIT_COMMIT: "017930ebf915121f8f593bef61cbbca82d78132d"
-  TINYCC_COMMIT: "b91835d8701523e895a2b447713630069514e291"
-  ICU_VERSION: "75.1"
   ZIG_VERSION: "0.15.2"
-  # 16 GB RAM runner — limit parallelism to avoid OOM during WebKit link,
-  # and add swap below.
+  ANDROID_API: "24"
+  PREBUILT_URL: "https://github.com/guysoft/opencode-termux/releases/download/v0.2.1/opencode-1.17.9-android-aarch64.zip"
   JOBS: "3"
   WORK_DIR: "/home/runner/opencode-android-build"
 
@@ -35,7 +36,7 @@ jobs:
   build:
     name: Build Android aarch64
     runs-on: ubuntu-latest
-    timeout-minutes: 350
+    timeout-minutes: 90
 
     steps:
       - name: Checkout repository
@@ -45,9 +46,6 @@ jobs:
         if: github.event.inputs.opencode_version
         run: echo "OPENCODE_VERSION=${{ github.event.inputs.opencode_version }}" >> $GITHUB_ENV
 
-      # =============================================
-      # Free disk space + swap (hosted runner has ~30GB free on /)
-      # =============================================
       - name: Free disk space
         run: |
           set -x
@@ -76,25 +74,15 @@ jobs:
         run: |
           mkdir -p "$WORK_DIR"
           echo "Work directory: $WORK_DIR"
-          df -h /
 
       # Executable bit can be lost when commits are made from Windows
       - name: Ensure build scripts are executable
         run: chmod +x android/scripts/*.sh install.sh
 
-      # =============================================
-      # Install build dependencies
-      # =============================================
       - name: Install system packages
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            ninja-build python3 ruby perl \
-            git curl wget unzip xz-utils zip \
-            build-essential pkg-config \
-            libxml2-dev libxslt1-dev \
-            golang-go \
-            autoconf automake libtool
+          sudo apt-get install -y curl wget unzip zip file binutils
 
       - name: Install Android NDK r28b
         run: |
@@ -112,15 +100,6 @@ jobs:
           fi
           echo "ANDROID_NDK_HOME=$NDK_DIR" >> $GITHUB_ENV
           echo "$NDK_DIR/toolchains/llvm/prebuilt/linux-x86_64/bin" >> $GITHUB_PATH
-
-      - name: Install Rust with Android target
-        run: |
-          if ! command -v rustup &>/dev/null; then
-            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-            echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-            source "$HOME/.cargo/env"
-          fi
-          rustup target add aarch64-linux-android
 
       - name: Install Zig ${{ env.ZIG_VERSION }}
         run: |
@@ -140,10 +119,9 @@ jobs:
 
       - name: Install Bun (host, pinned for module graph compatibility)
         run: |
-          # Proven combo (guysoft/opencode-termux): target Bun 1.2.13 runs on
-          # Android; host Bun must be >= 1.2.14 for catalog: support but
-          # <= 1.3.2 so it writes the 36-byte module graph stride that
-          # Bun 1.2.x can read.
+          # Host Bun must write the 36-byte module graph stride that the
+          # prebuilt target runtime (Bun 1.2.x-era) can read: <= 1.3.2.
+          # 1.3.2 is also new enough for opencode's catalog: workspaces.
           HOST_BUN_VERSION="${HOST_BUN_VERSION}"
           GOT="$(bun --version 2>/dev/null || true)"
           if [ "$GOT" != "$HOST_BUN_VERSION" ]; then
@@ -153,101 +131,17 @@ jobs:
             export PATH="$HOME/.bun/bin:$PATH"
           fi
           echo "Host Bun version: $(bun --version)"
-          echo "Target Bun version: $BUN_VERSION"
 
       # =============================================
-      # Cache expensive build artifacts
+      # Prebuilt Android runtime (the proven engine)
       # =============================================
-      - name: Compute patch hashes
-        id: hashes
-        run: |
-          BUN_PATCH_HASH=$(sha256sum android/patches/bun/android-support.patch | cut -c1-16)
-          WEBKIT_PATCH_HASH=$(sha256sum android/patches/webkit/android-support.patch | cut -c1-16)
-          ZIG_PATCH_HASH=$(sha256sum android/patches/zig/posix-android-sigaction.patch | cut -c1-16)
-          echo "bun_patch_hash=$BUN_PATCH_HASH" >> $GITHUB_OUTPUT
-          echo "webkit_patch_hash=$WEBKIT_PATCH_HASH" >> $GITHUB_OUTPUT
-          echo "zig_patch_hash=$ZIG_PATCH_HASH" >> $GITHUB_OUTPUT
-
-      - name: Cache ICU build
-        id: cache-icu
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.WORK_DIR }}/deps-android/prefix
-          key: icu-android-${{ env.ICU_VERSION }}-${{ env.ANDROID_API }}
-
-      - name: Cache WebKit build
-        id: cache-webkit
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.WORK_DIR }}/webkit-android
-          key: webkit-android-${{ env.WEBKIT_COMMIT }}-${{ steps.hashes.outputs.webkit_patch_hash }}
-
-      - name: Cache Bun binary
-        id: cache-bun
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.WORK_DIR }}/bun-build/bun
-          key: bun-android-${{ env.BUN_VERSION }}-${{ steps.hashes.outputs.bun_patch_hash }}-${{ steps.hashes.outputs.zig_patch_hash }}
-
-      # =============================================
-      # Clone and patch sources
-      # =============================================
-      - name: Clone and patch Bun + WebKit
-        if: steps.cache-bun.outputs.cache-hit != 'true' || steps.cache-webkit.outputs.cache-hit != 'true'
+      - name: Download prebuilt Android runtime
         run: |
           source android/scripts/env.sh
-          ./android/scripts/apply-patches.sh
+          ./android/scripts/download-prebuilt.sh
 
       # =============================================
-      # Build ICU
-      # =============================================
-      - name: Build ICU ${{ env.ICU_VERSION }}
-        if: steps.cache-icu.outputs.cache-hit != 'true'
-        run: |
-          source android/scripts/env.sh
-          ./android/scripts/build-icu.sh
-
-      # =============================================
-      # Build WebKit/JSC
-      # =============================================
-      - name: Build WebKit/JSC
-        if: steps.cache-webkit.outputs.cache-hit != 'true'
-        run: |
-          source android/scripts/env.sh
-          ./android/scripts/build-webkit.sh
-
-      # =============================================
-      # Build TinyCC (libtcc.a)
-      # =============================================
-      - name: Build TinyCC
-        if: steps.cache-bun.outputs.cache-hit != 'true'
-        run: |
-          source android/scripts/env.sh
-          ./android/scripts/build-tinycc.sh
-
-      # =============================================
-      # Build Bun
-      # =============================================
-      - name: Build Bun
-        if: steps.cache-bun.outputs.cache-hit != 'true'
-        run: |
-          source android/scripts/env.sh
-          # Need to clone + patch if only bun cache missed but webkit didn't
-          if [ ! -d "$BUN_SRC/.git" ]; then
-            ./android/scripts/apply-patches.sh
-          fi
-          ./android/scripts/build-bun.sh
-
-      - name: Verify Bun binary
-        run: |
-          BUN_BINARY="${WORK_DIR}/bun-build/bun"
-          echo "Bun binary: $BUN_BINARY"
-          ls -lh "$BUN_BINARY"
-          file "$BUN_BINARY"
-          readelf -h "$BUN_BINARY" | grep -E "Machine|Class"
-
-      # =============================================
-      # Build libopentui.so
+      # Build libopentui.so for Android
       # =============================================
       - name: Build libopentui.so
         run: |
@@ -266,7 +160,7 @@ jobs:
         run: |
           OPENCODE_BINARY="${WORK_DIR}/dist/opencode"
           echo "OpenCode binary: $OPENCODE_BINARY"
-          ls -lh "$OPENCODE_BINARY"
+          ls -lh "${WORK_DIR}/dist/"
           file "$OPENCODE_BINARY"
           readelf -h "$OPENCODE_BINARY" | grep -E "Machine|Class"
 
@@ -281,7 +175,7 @@ jobs:
       - name: List packages
         run: |
           echo "=== Built packages ==="
-          ls -lh "${WORK_DIR}/packages/"
+          ls -lh "${WORK_DIR}/packages/"*.zip "${WORK_DIR}/packages/"*.pkg.tar.xz "${WORK_DIR}/packages/"*.deb 2>/dev/null || true
 
       # =============================================
       # Upload artifacts
@@ -313,42 +207,31 @@ jobs:
 
             ### Installation (Termux)
             ```bash
-            curl -fsSL <raw install.sh URL> | bash
+            curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/main/install.sh | bash
             ```
 
             **Manual:**
             ```bash
             # Download opencode-${{ env.OPENCODE_VERSION }}-android-aarch64.zip, then:
             unzip opencode-${{ env.OPENCODE_VERSION }}-android-aarch64.zip
-            chmod +x opencode
-            mv opencode $PREFIX/bin/
+            sudo cp -r data/data/com.termux/files/usr/* $PREFIX/
             pkg install ripgrep
             ```
 
             ### Build info
-            - OpenCode: v${{ env.OPENCODE_VERSION }}
-            - Bun: v${{ env.BUN_VERSION }} (cross-compiled for Android aarch64)
-            - WebKit/JSC: ${{ env.WEBKIT_COMMIT }}
-            - ICU: ${{ env.ICU_VERSION }}
+            - OpenCode: v${{ env.OPENCODE_VERSION }} (our build)
+            - Android runtime: prebuilt from guysoft/opencode-termux v0.2.1
             - OpenTUI: ${{ env.OPENTUI_TAG }}
-            - Android API level: ${{ env.ANDROID_API }}
-            - NDK: r28b
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # =============================================
-      # Cleanup (keep cache, remove intermediates)
+      # Cleanup
       # =============================================
       - name: Cleanup intermediate files
         if: always()
         run: |
-          # Remove source trees (they can be re-cloned) but keep cached artifacts
-          rm -rf "${WORK_DIR}/bun-src" "${WORK_DIR}/webkit-src" "${WORK_DIR}/opentui-src" "${WORK_DIR}/opencode-src"
-          rm -rf "${WORK_DIR}/icu-src" "${WORK_DIR}/icu-host-build" "${WORK_DIR}/icu-android-build"
-          rm -rf "${WORK_DIR}/webkit-build" "${WORK_DIR}/tinycc-src"
-          # Clear Zig cache when bun-src is removed — the cache references files
-          # in vendor/zig/ which lives inside bun-src. Stale references cause
-          # FileNotFound errors in the translate-c output cache.
-          rm -rf "${WORK_DIR}/bun-build/cache/zig"
+          rm -rf "${WORK_DIR}/opentui-src" "${WORK_DIR}/opencode-src" \
+                 "${WORK_DIR}/zig-${{ env.ZIG_VERSION }}"
           echo "Cleaned up intermediate files"
           df -h /

@@ -14,20 +14,19 @@ set -euo pipefail
 export REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # Versions
-# BUN_VERSION: the Android (target) Bun. The android-support patch is authored
-#   against 1.2.13 — using the proven guysoft combo (target 1.2.13 + host 1.3.2).
-# HOST_BUN_VERSION: must produce a module graph stride the target can read:
-#   host <= 1.3.2 writes the 36-byte stride that Bun 1.2.x reads; host 1.2.13
-#   itself lacks the `catalog:` workspace protocol opencode's monorepo needs.
-export BUN_VERSION="${BUN_VERSION:-1.2.13}"
-export BUN_TAG="bun-v${BUN_VERSION}"
+# We no longer cross-compile Bun/WebKit/ICU ourselves: the pipeline uses the
+# PROVEN prebuilt Android runtime (opencode.bin + runtime .so files) published
+# by guysoft/opencode-termux (v0.2.1), which ships opencode 1.17.9. We pin our
+# OpenCode source to that same version for maximum runtime compatibility, and
+# only build libopentui.so (for @opentui/core 0.4.5) + bundle our own code.
+export OPENCODE_VERSION="${OPENCODE_VERSION:-1.17.9}"
 export HOST_BUN_VERSION="${HOST_BUN_VERSION:-1.3.2}"
-export WEBKIT_COMMIT="${WEBKIT_COMMIT:-017930ebf915121f8f593bef61cbbca82d78132d}"
-export ICU_VERSION="${ICU_VERSION:-75.1}"
 export ZIG_VERSION="${ZIG_VERSION:-0.15.2}"
 export OPENTUI_TAG="${OPENTUI_TAG:-v0.4.5}"
-export OPENCODE_VERSION="${OPENCODE_VERSION:-1.18.25}"
 export ANDROID_API="${ANDROID_API:-24}"
+
+# Prebuilt Android runtime from guysoft/opencode-termux v0.2.1
+export PREBUILT_URL="${PREBUILT_URL:-https://github.com/guysoft/opencode-termux/releases/download/v0.2.1/opencode-1.17.9-android-aarch64.zip}"
 
 # Android NDK
 export ANDROID_NDK_HOME="${ANDROID_NDK_HOME:-/opt/android-ndk}"
@@ -49,16 +48,10 @@ export ANDROID_LD="${NDK_TOOLCHAIN}/bin/ld.lld"
 
 # Build directories (all relative to REPO_ROOT)
 export WORK_DIR="${WORK_DIR:-${REPO_ROOT}/build}"
-export BUN_SRC="${WORK_DIR}/bun-src"
-export WEBKIT_SRC="${WORK_DIR}/webkit-src"
 export OPENTUI_SRC="${WORK_DIR}/opentui-src"
 export OPENCODE_SRC="${WORK_DIR}/opencode-src"
-export ICU_SRC="${WORK_DIR}/icu-src"
+export PREBUILT_DIR="${WORK_DIR}/prebuilt"
 
-export DEPS_PREFIX="${WORK_DIR}/deps-android/prefix"
-export WEBKIT_BUILD="${WORK_DIR}/webkit-build"
-export WEBKIT_OUTPUT="${WORK_DIR}/webkit-android"
-export BUN_BUILD="${WORK_DIR}/bun-build"
 export DIST_DIR="${WORK_DIR}/dist"
 
 # Number of parallel jobs (can be overridden for low-RAM machines)
@@ -67,12 +60,8 @@ export JOBS="${JOBS:-$(nproc)}"
 echo "=== OpenCode Android Build Environment ==="
 echo "Repo root:     ${REPO_ROOT}"
 echo "Work dir:      ${WORK_DIR}"
-echo "NDK:           ${ANDROID_NDK_HOME}"
-echo "API Level:     ${ANDROID_API}"
-echo "Target:        ${ANDROID_TRIPLE}"
-echo "Bun version:   ${BUN_VERSION} (host: ${HOST_BUN_VERSION})"
-echo "WebKit commit: ${WEBKIT_COMMIT}"
+echo "Prebuilt URL:  ${PREBUILT_URL}"
 echo "OpenTUI tag:   ${OPENTUI_TAG}"
-echo "OpenCode ver:  ${OPENCODE_VERSION}"
+echo "OpenCode ver:  ${OPENCODE_VERSION} (host bun: ${HOST_BUN_VERSION})"
 echo "Jobs:          ${JOBS}"
 echo "==========================================="

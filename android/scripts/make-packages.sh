@@ -3,10 +3,14 @@
 #
 # Usage: ./scripts/make-packages.sh
 #
-# Creates three package formats:
-# 1. ZIP: opencode-${VERSION}-android-aarch64.zip (standalone binary)
+# Creates three package formats, all containing:
+#   opencode       -> $PREFIX/bin/         (standalone binary, our build)
+#   opencode.bin   -> $PREFIX/libexec/opencode/  (prebuilt android bun runtime)
+#   *.so           -> $PREFIX/lib/         (runtime shared libraries)
+#
+# 1. ZIP: opencode-${VERSION}-android-aarch64.zip
 # 2. Pacman: opencode-${VERSION}-1-aarch64.pkg.tar.xz (Termux pacman format)
-# 3. Deb: opencode_${VERSION}_aarch64.deb (old Termux deb format)
+# 3. Deb: opencode_${VERSION}_aarch64.deb
 
 set -euo pipefail
 
@@ -31,13 +35,29 @@ BUILD_DATE=$(date +%s)
 rm -rf "$PKG_DIR"
 mkdir -p "$PKG_DIR"
 
+# Termux prefix layout inside the package
+PREFIX_DIR="data/data/com.termux/files/usr"
+
 # ==========================================
-# 1. ZIP package
+# 1. ZIP package (used by install.sh)
 # ==========================================
 echo ">>> Creating ZIP package..."
 ZIP_NAME="opencode-${OPENCODE_VERSION}-android-aarch64.zip"
-cd "$DIST_DIR"
-zip -9 "$PKG_DIR/$ZIP_NAME" opencode
+ZIP_STAGING="$PKG_DIR/zip-staging"
+mkdir -p "$ZIP_STAGING/$PREFIX_DIR/bin" \
+         "$ZIP_STAGING/$PREFIX_DIR/libexec/opencode" \
+         "$ZIP_STAGING/$PREFIX_DIR/lib"
+
+cp "$DIST_DIR/opencode"     "$ZIP_STAGING/$PREFIX_DIR/bin/"
+cp "$DIST_DIR/opencode.bin" "$ZIP_STAGING/$PREFIX_DIR/libexec/opencode/" 2>/dev/null \
+    || echo "WARNING: opencode.bin missing from dist"
+for so in "$DIST_DIR"/*.so; do
+    [ -f "$so" ] && cp "$so" "$ZIP_STAGING/$PREFIX_DIR/lib/"
+done
+
+cd "$ZIP_STAGING"
+chmod 755 "$PREFIX_DIR/bin/opencode" "$PREFIX_DIR/libexec/opencode/opencode.bin" 2>/dev/null || true
+zip -9 -r "$PKG_DIR/$ZIP_NAME" data
 echo "    Created $ZIP_NAME"
 
 # ==========================================
@@ -45,19 +65,16 @@ echo "    Created $ZIP_NAME"
 # ==========================================
 echo ">>> Creating pacman package..."
 PACMAN_STAGING="$PKG_DIR/pacman-staging"
-mkdir -p "$PACMAN_STAGING/data/data/com.termux/files/usr/bin"
+mkdir -p "$PACMAN_STAGING"
+cp -r "$ZIP_STAGING/$PREFIX_DIR" "$PACMAN_STAGING/"
 
-cp "$OPENCODE_BINARY" "$PACMAN_STAGING/data/data/com.termux/files/usr/bin/opencode"
-chmod 755 "$PACMAN_STAGING/data/data/com.termux/files/usr/bin/opencode"
-
-# Create .PKGINFO
 cat > "$PACMAN_STAGING/.PKGINFO" << EOF
 pkgname = opencode
 pkgver = ${OPENCODE_VERSION}-1
 pkgdesc = AI-powered coding assistant for the terminal
-url = https://github.com/anomalyco/opencode
+url = https://github.com/zyvoai/zyvo
 builddate = ${BUILD_DATE}
-packager = opencode-termux
+packager = zyvo
 size = ${BINARY_SIZE}
 arch = aarch64
 license = MIT
@@ -74,32 +91,26 @@ echo "    Created $PACMAN_NAME"
 # ==========================================
 echo ">>> Creating deb package..."
 DEB_STAGING="$PKG_DIR/deb-staging"
-mkdir -p "$DEB_STAGING/data/data/data/com.termux/files/usr/bin"
 mkdir -p "$DEB_STAGING/DEBIAN"
+cp -r "$ZIP_STAGING/data" "$DEB_STAGING/"
 
-cp "$OPENCODE_BINARY" "$DEB_STAGING/data/data/data/com.termux/files/usr/bin/opencode"
-chmod 755 "$DEB_STAGING/data/data/data/com.termux/files/usr/bin/opencode"
-
-# Create control file
 INSTALLED_SIZE=$((BINARY_SIZE / 1024))
 cat > "$DEB_STAGING/DEBIAN/control" << EOF
 Package: opencode
 Version: ${OPENCODE_VERSION}
 Architecture: aarch64
-Maintainer: Guy Sheffer <guysoft@gmail.com>
+Maintainer: zyvo
 Installed-Size: ${INSTALLED_SIZE}
 Depends: ripgrep
 Section: utils
 Priority: optional
-Homepage: https://github.com/anomalyco/opencode
+Homepage: https://github.com/zyvoai/zyvo
 Description: AI-powered coding assistant for the terminal
  OpenCode is an AI-powered coding assistant that runs in the terminal.
  This package provides a standalone binary compiled for Android/Termux.
 EOF
 
 DEB_NAME="opencode_${OPENCODE_VERSION}_aarch64.deb"
-
-# Build deb manually (dpkg-deb may not be available)
 cd "$DEB_STAGING/data"
 tar czf "$DEB_STAGING/data.tar.gz" data
 cd "$DEB_STAGING/DEBIAN"
@@ -120,4 +131,4 @@ echo ""
 echo "Install on Termux:"
 echo "  pacman -U $PACMAN_NAME"
 echo "  dpkg -i $DEB_NAME"
-echo "  unzip $ZIP_NAME -d /data/data/com.termux/files/usr/bin/"
+echo "  # or via install.sh with the zip"

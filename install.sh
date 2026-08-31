@@ -81,12 +81,25 @@ curl -fL --progress-bar "$ASSET_URL" -o "$ZIP_FILE" || die "Download failed."
 
 # ---------------------------------------------------------------
 # 4. Install
+#    The zip contains a Termux prefix layout:
+#      data/data/com.termux/files/usr/bin/opencode
+#      data/data/com.termux/files/usr/libexec/opencode/opencode.bin
+#      data/data/com.termux/files/usr/lib/*.so
 # ---------------------------------------------------------------
-info "Installing to \$PREFIX/bin/${BINARY_NAME}..."
+info "Installing..."
 unzip -o "$ZIP_FILE" -d "$TMP_DIR" >/dev/null
-[ -f "${TMP_DIR}/${BINARY_NAME}" ] || die "Downloaded archive does not contain ${BINARY_NAME}."
-chmod +x "${TMP_DIR}/${BINARY_NAME}"
-mv "${TMP_DIR}/${BINARY_NAME}" "$PREFIX/bin/${BINARY_NAME}"
+USR_DIR="${TMP_DIR}/data/data/com.termux/files/usr"
+[ -f "${USR_DIR}/bin/${BINARY_NAME}" ] || die "Downloaded archive does not contain ${BINARY_NAME}."
+
+mkdir -p "$PREFIX/bin" "$PREFIX/libexec/opencode" "$PREFIX/lib"
+cp "${USR_DIR}/bin/${BINARY_NAME}" "$PREFIX/bin/${BINARY_NAME}"
+chmod +x "$PREFIX/bin/${BINARY_NAME}"
+# Android bun runtime (used by the binary for worker processes) + shared libs
+[ -f "${USR_DIR}/libexec/opencode/opencode.bin" ] && \
+  cp "${USR_DIR}/libexec/opencode/opencode.bin" "$PREFIX/libexec/opencode/opencode.bin"
+for so in "${USR_DIR}"/lib/*.so; do
+  [ -f "$so" ] && cp "$so" "$PREFIX/lib/"
+done
 rm -rf "$TMP_DIR"
 
 # ---------------------------------------------------------------
