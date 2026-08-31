@@ -41,6 +41,10 @@ PREFIX_DIR="data/data/com.termux/files/usr"
 # ==========================================
 # 1. ZIP package (used by install.sh)
 # ==========================================
+# Layout (matches the wrapper script's expectations):
+#   bin/opencode                    <- wrapper sh script (Android env fixes)
+#   libexec/opencode/opencode.bin   <- OUR standalone binary (this build)
+#   lib/libopentui.so, libtagfix.so, libc++_shared.so
 echo ">>> Creating ZIP package..."
 ZIP_NAME="opencode-${OPENCODE_VERSION}-android-aarch64.zip"
 ZIP_STAGING="$PKG_DIR/zip-staging"
@@ -48,9 +52,8 @@ mkdir -p "$ZIP_STAGING/$PREFIX_DIR/bin" \
          "$ZIP_STAGING/$PREFIX_DIR/libexec/opencode" \
          "$ZIP_STAGING/$PREFIX_DIR/lib"
 
-cp "$DIST_DIR/opencode"     "$ZIP_STAGING/$PREFIX_DIR/bin/"
-cp "$DIST_DIR/opencode.bin" "$ZIP_STAGING/$PREFIX_DIR/libexec/opencode/" 2>/dev/null \
-    || echo "WARNING: opencode.bin missing from dist"
+cp "$DIST_DIR/opencode-wrapper" "$ZIP_STAGING/$PREFIX_DIR/bin/opencode"
+cp "$DIST_DIR/opencode"         "$ZIP_STAGING/$PREFIX_DIR/libexec/opencode/opencode.bin"
 for so in "$DIST_DIR"/*.so; do
     [ -f "$so" ] && cp "$so" "$ZIP_STAGING/$PREFIX_DIR/lib/"
 done

@@ -285,7 +285,30 @@ console.log(`Module graph size: ${finalModuleGraph.length} bytes (unchanged)`)
 // Step 6: Create Android standalone binary
 console.log("\n=== Step 6: Creating Android standalone binary ===")
 
-const androidBunBytes = new Uint8Array(await Bun.file(ANDROID_BUN).arrayBuffer())
+// ANDROID_BUN is the prebuilt runtime from guysoft's release: an android bun
+// WITH his opencode module graph already appended. Strip that graph so we
+// append ours to the bare bun runtime ([bun][graph][total u64]).
+function stripModuleGraph(bytes: Uint8Array): Uint8Array {
+  const buf = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.length)
+  const TRAILER = Buffer.from("\n---- Bun! ----\n")
+  const trailerEnd = bytes.length - 8
+  const trailerStart = trailerEnd - TRAILER.length
+  if (trailerStart < 0 || buf.compare(TRAILER, 0, TRAILER.length, trailerStart, trailerEnd) !== 0) {
+    // No module graph (bare bun runtime) — use as-is
+    console.log("Android bun has no embedded module graph (bare runtime)")
+    return bytes
+  }
+  const offsetsStart = trailerStart - 32
+  const graphBytes = Number(buf.readBigUInt64LE(offsetsStart))
+  const graphSize = graphBytes + 32 + TRAILER.length
+  const bunSize = bytes.length - 8 - graphSize
+  console.log(`Stripping existing module graph: ${graphSize} bytes (bun core: ${bunSize} bytes)`)
+  if (bunSize <= 0) throw new Error("Failed to parse android bun module graph")
+  return bytes.slice(0, bunSize)
+}
+
+const androidBunStripped = stripModuleGraph(new Uint8Array(await Bun.file(ANDROID_BUN).arrayBuffer()))
+const androidBunBytes = androidBunStripped
 const androidBunSize = androidBunBytes.length
 console.log(`Android bun size: ${androidBunSize}`)
 

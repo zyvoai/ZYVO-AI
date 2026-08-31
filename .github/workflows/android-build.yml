@@ -26,8 +26,6 @@ env:
   OPENCODE_VERSION: "1.17.9"
   HOST_BUN_VERSION: "1.3.2"
   OPENTUI_TAG: "v0.4.5"
-  ZIG_VERSION: "0.15.2"
-  ANDROID_API: "24"
   PREBUILT_URL: "https://github.com/guysoft/opencode-termux/releases/download/v0.2.1/opencode-1.17.9-android-aarch64.zip"
   JOBS: "3"
   WORK_DIR: "/home/runner/opencode-android-build"
@@ -36,7 +34,7 @@ jobs:
   build:
     name: Build Android aarch64
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 40
 
     steps:
       - name: Checkout repository
@@ -84,39 +82,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y curl wget unzip zip file binutils
 
-      - name: Install Android NDK r28b
-        run: |
-          NDK_DIR="/opt/android-ndk"
-          if [ -d "$NDK_DIR/toolchains/llvm/prebuilt/linux-x86_64" ]; then
-            echo "NDK already installed at $NDK_DIR"
-          else
-            echo "Downloading Android NDK r28b..."
-            cd /tmp
-            wget -q "https://dl.google.com/android/repository/android-ndk-r28b-linux.zip" -O ndk.zip
-            sudo mkdir -p /opt
-            sudo unzip -q ndk.zip -d /opt/
-            sudo mv /opt/android-ndk-r28b "$NDK_DIR"
-            rm ndk.zip
-          fi
-          echo "ANDROID_NDK_HOME=$NDK_DIR" >> $GITHUB_ENV
-          echo "$NDK_DIR/toolchains/llvm/prebuilt/linux-x86_64/bin" >> $GITHUB_PATH
-
-      - name: Install Zig ${{ env.ZIG_VERSION }}
-        run: |
-          ZIG_DIR="$WORK_DIR/zig-${ZIG_VERSION}"
-          if [ -x "$ZIG_DIR/zig" ]; then
-            echo "Zig already installed at $ZIG_DIR"
-          else
-            echo "Downloading Zig ${ZIG_VERSION}..."
-            cd /tmp
-            wget -q "https://ziglang.org/download/${ZIG_VERSION}/zig-x86_64-linux-${ZIG_VERSION}.tar.xz" -O zig.tar.xz
-            mkdir -p "$ZIG_DIR"
-            tar xf zig.tar.xz -C "$ZIG_DIR" --strip-components=1
-            rm zig.tar.xz
-          fi
-          echo "ZIG_BIN=$ZIG_DIR/zig" >> $GITHUB_ENV
-          echo "$ZIG_DIR" >> $GITHUB_PATH
-
       - name: Install Bun (host, pinned for module graph compatibility)
         run: |
           # Host Bun must write the 36-byte module graph stride that the
@@ -141,15 +106,9 @@ jobs:
           ./android/scripts/download-prebuilt.sh
 
       # =============================================
-      # Build libopentui.so for Android
-      # =============================================
-      - name: Build libopentui.so
-        run: |
-          source android/scripts/env.sh
-          ./android/scripts/build-opentui.sh
-
-      # =============================================
       # Build OpenCode standalone binary
+      # (bundles OUR source onto the prebuilt android bun runtime;
+      #  libopentui.so etc. come from the prebuilt zip)
       # =============================================
       - name: Build OpenCode standalone binary
         run: |
@@ -190,12 +149,13 @@ jobs:
             ${{ env.WORK_DIR }}/packages/*.deb
 
       # =============================================
-      # Release (only on android-v* tag push)
+      # Release — every successful build updates the release
+      # (install.sh pulls whatever is latest here)
       # =============================================
       - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/android-v')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: android-v${{ env.OPENCODE_VERSION }}
           files: |
             ${{ env.WORK_DIR }}/packages/*.zip
             ${{ env.WORK_DIR }}/packages/*.pkg.tar.xz
@@ -221,7 +181,6 @@ jobs:
             ### Build info
             - OpenCode: v${{ env.OPENCODE_VERSION }} (our build)
             - Android runtime: prebuilt from guysoft/opencode-termux v0.2.1
-            - OpenTUI: ${{ env.OPENTUI_TAG }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -231,7 +190,6 @@ jobs:
       - name: Cleanup intermediate files
         if: always()
         run: |
-          rm -rf "${WORK_DIR}/opentui-src" "${WORK_DIR}/opencode-src" \
-                 "${WORK_DIR}/zig-${{ env.ZIG_VERSION }}"
+          rm -rf "${WORK_DIR}/opencode-src"
           echo "Cleaned up intermediate files"
           df -h /

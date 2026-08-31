@@ -42,8 +42,12 @@ cd "$OPENCODE_SRC"
 if ! "$HOST_BUN" install; then
     echo ">>> bun install failed (lockfile may be from a newer Bun)."
     echo ">>> Removing bun.lock and resolving fresh..."
-    mv bun.lock bun.lock.android-build.bak
-    "$HOST_BUN" install
+    mv bun.lock bun.lock.android-build.bak 2>/dev/null || true
+    if ! "$HOST_BUN" install; then
+        echo ">>> Still failing — removing packageManager pin and retrying..."
+        sed -i '/"packageManager"/d' package.json
+        "$HOST_BUN" install
+    fi
 fi
 
 # OpenCode's own build script installs all platform variants of the native
@@ -64,12 +68,13 @@ if [ ! -f "$ANDROID_BUN" ]; then
     exit 1
 fi
 
-# Find ARM64 libopentui.so
-# build.zig installs to ../lib/{target} relative to the zig dir
-ARM64_LIBOPENTUI="$OPENTUI_SRC/packages/core/src/lib/aarch64-linux-android/libopentui.so"
+# Find ARM64 libopentui.so (prebuilt, matching @opentui/core version)
+# On Android the .so is loaded from the real filesystem via OPENTUI_LIB_PATH
+# (set by the wrapper script), not from the bunfs virtual path.
+ARM64_LIBOPENTUI="$PREBUILT_DIR/libopentui.so"
 if [ ! -f "$ARM64_LIBOPENTUI" ]; then
     echo "ERROR: ARM64 libopentui.so not found at $ARM64_LIBOPENTUI"
-    echo "       Run scripts/build-opentui.sh first."
+    echo "       Run scripts/download-prebuilt.sh first."
     exit 1
 fi
 
@@ -107,15 +112,14 @@ fi
 # Create dist directory
 mkdir -p "$DIST_DIR"
 
-# Ship the prebuilt runtime files alongside our binary: the standalone binary
-# re-executes the plain android bun for worker processes (opencode.bin), and
-# its runtime .so dependencies must live in $PREFIX/lib on the phone.
-if [ -d "$PREBUILT_DIR" ]; then
-    for f in "$PREBUILT_DIR"/*.so; do
-        [ -f "$f" ] && cp "$f" "$DIST_DIR/"
-    done
-    [ -f "$PREBUILT_DIR/opencode.bin" ] && cp "$PREBUILT_DIR/opencode.bin" "$DIST_DIR/"
-fi
+# Ship the prebuilt runtime pieces: wrapper script (Android env fixes), the
+# original prebuilt binary (reference/backup), and the runtime .so files
+# (libopentui, libtagfix heap-tagging fix, libc++_shared for the JIT).
+for f in "$PREBUILT_DIR"/*.so; do
+    [ -f "$f" ] && cp "$f" "$DIST_DIR/"
+done
+[ -f "$PREBUILT_DIR/opencode" ] && cp "$PREBUILT_DIR/opencode" "$DIST_DIR/opencode-wrapper"
+[ -f "$PREBUILT_DIR/opencode.bin" ] && cp "$PREBUILT_DIR/opencode.bin" "$DIST_DIR/opencode-prebuilt.bin"
 
 # Run the TypeScript build script
 # Copy it into the OpenCode package tree so Bun can resolve @opentui/solid/bun-plugin
