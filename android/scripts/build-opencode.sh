@@ -109,17 +109,9 @@ else
     echo "         The build may embed the wrong architecture"
 fi
 
-# Create dist directory
+# Create dist directory (the TS build script wipes and recreates it,
+# so runtime pieces must be copied AFTER it runs)
 mkdir -p "$DIST_DIR"
-
-# Ship the prebuilt runtime pieces: wrapper script (Android env fixes), the
-# original prebuilt binary (reference/backup), and the runtime .so files
-# (libopentui, libtagfix heap-tagging fix, libc++_shared for the JIT).
-for f in "$PREBUILT_DIR"/*.so; do
-    [ -f "$f" ] && cp "$f" "$DIST_DIR/"
-done
-[ -f "$PREBUILT_DIR/opencode" ] && cp "$PREBUILT_DIR/opencode" "$DIST_DIR/opencode-wrapper"
-[ -f "$PREBUILT_DIR/opencode.bin" ] && cp "$PREBUILT_DIR/opencode.bin" "$DIST_DIR/opencode-prebuilt.bin"
 
 # Run the TypeScript build script
 # Copy it into the OpenCode package tree so Bun can resolve @opentui/solid/bun-plugin
@@ -144,6 +136,15 @@ if [ -n "$BACKUP_FILE" ] && [ -f "$BACKUP_FILE" ]; then
     echo ">>> Restoring original x86_64 libopentui.so..."
     mv "$BACKUP_FILE" "$OPENTUI_NODE_MODULE"
 fi
+
+# Ship the prebuilt runtime pieces: wrapper script (Android env fixes), the
+# original prebuilt binary (reference/backup), and the runtime .so files
+# (libopentui, libtagfix heap-tagging fix, libc++_shared for the JIT).
+for f in "$PREBUILT_DIR"/*.so; do
+    if [ -f "$f" ]; then cp "$f" "$DIST_DIR/"; fi
+done
+if [ -f "$PREBUILT_DIR/opencode" ]; then cp "$PREBUILT_DIR/opencode" "$DIST_DIR/opencode-wrapper"; fi
+if [ -f "$PREBUILT_DIR/opencode.bin" ]; then cp "$PREBUILT_DIR/opencode.bin" "$DIST_DIR/opencode-prebuilt.bin"; fi
 
 # Verify output
 OPENCODE_BINARY="$DIST_DIR/opencode"
