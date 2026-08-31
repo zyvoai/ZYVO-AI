@@ -74,10 +74,13 @@ if [ ! -d "$NDK_SYSROOT/usr/include" ]; then
 fi
 LIBC_TXT="$WORK_DIR/android-libc.txt"
 mkdir -p "$WORK_DIR"
+# NDK clang finds arch headers (asm/, machine/) via the triple-specific
+# include dir; zig libc.txt takes colon-separated include paths.
+TRIPLE_INC="$NDK_SYSROOT/usr/include/${ANDROID_TRIPLE}"
 cat > "$LIBC_TXT" << EOF
-include_dir=$NDK_SYSROOT/usr/include
-sys_include_dir=$NDK_SYSROOT/usr/include
-crt_dir=$NDK_TOOLCHAIN/sysroot/usr/lib/aarch64-linux-android/${ANDROID_API}
+include_dir=$NDK_SYSROOT/usr/include:$TRIPLE_INC
+sys_include_dir=$NDK_SYSROOT/usr/include:$TRIPLE_INC
+crt_dir=$NDK_SYSROOT/usr/lib/${ANDROID_TRIPLE}/${ANDROID_API}
 msvc_lib_dir=
 kernel32_lib_dir=
 gcc_dir=
