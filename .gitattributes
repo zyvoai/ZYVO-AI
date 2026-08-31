@@ -1,0 +1,11 @@
+packages/core/migration/**/snapshot.json linguist-generated
+packages/core/src/database/migration.gen.ts linguist-generated
+
+# Force LF for files that must stay POSIX-safe on Linux CI
+*.sh text eol=lf
+*.ts text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.patch text eol=lf
+*.cmake text eol=lf
