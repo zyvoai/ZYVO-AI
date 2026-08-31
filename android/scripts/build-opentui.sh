@@ -64,11 +64,32 @@ if grep -q 'artifact.linkSystemLibrary("dl");' "$OPENTUI_ZIG_DIR/build.zig"; the
 fi
 
 echo ">>> Building with Zig (target: aarch64-linux-android)..."
+
+# Zig does not bundle bionic libc. Provide NDK sysroot paths via a libc.txt
+# so the C/C++ parts (yoga, miniaudio shim) can compile against bionic.
+if [ ! -d "$NDK_SYSROOT/usr/include" ]; then
+    echo "ERROR: Android NDK sysroot not found at $NDK_SYSROOT"
+    echo "       Set ANDROID_NDK_HOME (see env.sh)."
+    exit 1
+fi
+LIBC_TXT="$WORK_DIR/android-libc.txt"
+mkdir -p "$WORK_DIR"
+cat > "$LIBC_TXT" << EOF
+include_dir=$NDK_SYSROOT/usr/include
+sys_include_dir=$NDK_SYSROOT/usr/include
+crt_dir=$NDK_TOOLCHAIN/sysroot/usr/lib/aarch64-linux-android/${ANDROID_API}
+msvc_lib_dir=
+kernel32_lib_dir=
+gcc_dir=
+EOF
+echo "    libc paths: $LIBC_TXT"
+
 cd "$OPENTUI_ZIG_DIR"
 
 "$ZIG_BIN" build \
     -Dtarget=aarch64-linux-android \
     -Doptimize=ReleaseSafe \
+    --libc "$LIBC_TXT" \
     --prefix . 2>&1
 
 # The build.zig installs to dest_dir="../lib/{output_name}" relative to
