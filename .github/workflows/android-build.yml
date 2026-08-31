@@ -78,6 +78,10 @@ jobs:
           echo "Work directory: $WORK_DIR"
           df -h /
 
+      # Executable bit can be lost when commits are made from Windows
+      - name: Ensure build scripts are executable
+        run: chmod +x android/scripts/*.sh install.sh
+
       # =============================================
       # Install build dependencies
       # =============================================
