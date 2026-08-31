@@ -35,6 +35,8 @@ jobs:
     name: Build Android aarch64
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout repository
