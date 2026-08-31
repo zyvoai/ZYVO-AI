@@ -47,12 +47,11 @@ Termux. No proot, no glibc layer, no rebuilding on the phone.
 **1. Install (copy-paste in Termux):**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/OWNER/REPO/main/install.sh | bash -s -- OWNER/REPO
+curl -fsSL https://raw.githubusercontent.com/zyvoai/zyvo/main/install.sh | bash -s -- zyvoai/zyvo
 ```
 
-> Replace `OWNER/REPO` with this repo's GitHub path. The installer checks the
-> architecture, installs `ripgrep`, downloads the latest Android build from
-> Releases, and verifies it runs.
+> The installer checks the architecture, installs `ripgrep`, downloads the
+> latest Android build from Releases, and verifies it runs.
 
 **2. Add an AI provider key and start:**
 

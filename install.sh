@@ -3,8 +3,8 @@
 # Zyvo / OpenCode one-click installer for Termux (Android aarch64)
 #
 # Usage (in Termux):
-#   curl -fsSL https://raw.githubusercontent.com/OWNER/zyvo/main/install.sh | bash
-#   # or: bash install.sh OWNER/zyvo
+#   curl -fsSL https://raw.githubusercontent.com/zyvoai/zyvo/main/install.sh | bash
+#   # or: bash install.sh zyvoai/zyvo
 #
 # Installs the native Android build released by this repo's GitHub Actions
 # workflow. Direct binary — no proot, no glibc layer.
@@ -13,9 +13,9 @@ set -euo pipefail
 
 # ---------------------------------------------------------------
 # Config: repo that hosts the release (owner/name).
-# Override with:  bash install.sh OWNER/REPO   or   ZYVO_REPO=OWNER/REPO
+# Override with:  bash install.sh zyvoai/zyvo   or   ZYVO_REPO=zyvoai/zyvo
 # ---------------------------------------------------------------
-GITHUB_REPO="${1:-${ZYVO_REPO:-OWNER/zyvo}}"
+GITHUB_REPO="${1:-${ZYVO_REPO:-zyvoai/zyvo}}"
 
 BINARY_NAME="opencode"
 ASSET_PATTERN="android-aarch64.zip"
@@ -35,9 +35,9 @@ case "$(uname -m)" in
   *) die "Unsupported architecture: $(uname -m). Currently only aarch64 (64-bit ARM) phones are supported." ;;
 esac
 
-if [ "$GITHUB_REPO" = "OWNER/zyvo" ]; then
-  die "Repository not configured. Run:  bash install.sh OWNER/REPO
-       (replace OWNER/REPO with the GitHub repo this file lives in)"
+if [ "$GITHUB_REPO" = "zyvoai/zyvo" ]; then
+  die "Repository not configured. Run:  bash install.sh zyvoai/zyvo
+       (replace zyvoai/zyvo with the GitHub repo this file lives in)"
 fi
 
 command -v curl >/dev/null 2>&1 || { info "Installing curl..."; pkg install -y curl; }
