@@ -20,7 +20,6 @@
 import { $ } from "bun"
 import fs from "fs"
 import path from "path"
-import { fileURLToPath } from "url"
 import { createSolidTransformPlugin } from "@opentui/solid/bun-plugin"
 
 // These are set by the build-opencode.sh wrapper script
@@ -70,13 +69,24 @@ if (process.env.MODELS_DEV_API_JSON) {
 }
 console.log(`Loaded models.dev snapshot (${(modelsData.length / 1024 / 1024).toFixed(1)} MB)`)
 
-// Step 2: Resolve the tree-sitter worker (mirrors upstream build.ts)
+// Step 2: Resolve the tree-sitter worker.
+// On host Bun 1.3.2 we can't use Bun.build's `files` option (added later),
+// so we embed the real parser.worker.js from node_modules as an entrypoint
+// and point OTUI_TREE_SITTER_WORKER_PATH at its embedded bunfs path.
 console.log("\n=== Step 2: Resolving tree-sitter worker ===")
-const treeSitterWorker = await Bun.file(fileURLToPath(import.meta.resolve("@opentui/core/parser.worker"))).text()
 const workerPath = "./src/cli/tui/worker.ts"
-const treeSitterWorkerPath = "opentui-tree-sitter-worker.js"
 const bunfsRoot = "/$bunfs/root/"
+const localWorkerPath = path.resolve(OPENCODE_DIR, "node_modules/@opentui/core/parser.worker.js")
+const rootWorkerPath = path.resolve(OPENCODE_DIR, "../../node_modules/@opentui/core/parser.worker.js")
+let parserWorkerResolved: string
+try {
+  parserWorkerResolved = fs.realpathSync(fs.existsSync(localWorkerPath) ? localWorkerPath : rootWorkerPath)
+} catch {
+  parserWorkerResolved = require.resolve("@opentui/core/parser.worker.js")
+}
+const workerRelativePath = path.relative(OPENCODE_DIR, parserWorkerResolved).replaceAll("\\", "/")
 console.log(`TUI worker: ${workerPath}`)
+console.log(`Tree-sitter worker: ${parserWorkerResolved}`)
 
 const plugin = createSolidTransformPlugin()
 
@@ -94,10 +104,8 @@ const result = await Bun.build({
   tsconfig: "./tsconfig.json",
   plugins: [plugin],
   external: ["node-gyp"],
-  format: "esm",
   minify: true,
   sourcemap: "none",
-  splitting: true,
   compile: {
     autoloadBunfig: false,
     autoloadDotenv: false,
@@ -106,15 +114,12 @@ const result = await Bun.build({
     outfile: hostBinaryPath,
     execArgv: [`--user-agent=opencode/${VERSION}`, "--use-system-ca", "--"],
   },
-  files: {
-    [treeSitterWorkerPath]: treeSitterWorker,
-  },
-  entrypoints: ["./src/index.ts", workerPath, treeSitterWorkerPath],
+  entrypoints: ["./src/index.ts", workerPath, parserWorkerResolved],
   define: {
     FFF_LIBC: JSON.stringify("gnu"),
     OPENCODE_VERSION: `'${VERSION}'`,
     OPENCODE_MODELS_DEV: modelsData,
-    OTUI_TREE_SITTER_WORKER_PATH: bunfsRoot + treeSitterWorkerPath,
+    OTUI_TREE_SITTER_WORKER_PATH: bunfsRoot + workerRelativePath,
     OPENCODE_WORKER_PATH: workerPath,
     OPENCODE_CHANNEL: `'${CHANNEL}'`,
     OPENCODE_LIBC: "",

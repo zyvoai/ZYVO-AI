@@ -14,9 +14,14 @@ set -euo pipefail
 export REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # Versions
-export BUN_VERSION="${BUN_VERSION:-1.3.11}"
+# BUN_VERSION: the Android (target) Bun. The android-support patch is authored
+#   against 1.2.13 — using the proven guysoft combo (target 1.2.13 + host 1.3.2).
+# HOST_BUN_VERSION: must produce a module graph stride the target can read:
+#   host <= 1.3.2 writes the 36-byte stride that Bun 1.2.x reads; host 1.2.13
+#   itself lacks the `catalog:` workspace protocol opencode's monorepo needs.
+export BUN_VERSION="${BUN_VERSION:-1.2.13}"
 export BUN_TAG="bun-v${BUN_VERSION}"
-export HOST_BUN_VERSION="${HOST_BUN_VERSION:-1.3.11}"
+export HOST_BUN_VERSION="${HOST_BUN_VERSION:-1.3.2}"
 export WEBKIT_COMMIT="${WEBKIT_COMMIT:-00e825523d549a556d75985f486e4954af6ab8c7}"
 export ICU_VERSION="${ICU_VERSION:-75.1}"
 export ZIG_VERSION="${ZIG_VERSION:-0.15.2}"
