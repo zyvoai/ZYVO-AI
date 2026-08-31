@@ -69,7 +69,7 @@ echo "    Created $ZIP_NAME"
 echo ">>> Creating pacman package..."
 PACMAN_STAGING="$PKG_DIR/pacman-staging"
 mkdir -p "$PACMAN_STAGING"
-cp -r "$ZIP_STAGING/$PREFIX_DIR" "$PACMAN_STAGING/"
+cp -r "$ZIP_STAGING/data" "$PACMAN_STAGING/"
 
 cat > "$PACMAN_STAGING/.PKGINFO" << EOF
 pkgname = opencode
