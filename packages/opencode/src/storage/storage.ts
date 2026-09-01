@@ -1,5 +1,6 @@
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import path from "path"
+import { existsSync, mkdirSync } from "fs"
 import { Global } from "@opencode-ai/core/global"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { Effect, Exit, Layer, Option, RcMap, Schema, Context, TxReentrantLock } from "effect"
@@ -65,8 +66,27 @@ export class Service extends Context.Service<Service, Interface>()("@opencode/St
 // there, while heavy streaming data (messages/parts) stays on the fast
 // private data dir. Reads and writes both resolve through file()/list(), so
 // the redirect stays consistent.
+let zyvoRootCache: string | undefined | null = null
+function zyvoRoot(): string | undefined {
+  if (zyvoRootCache !== null) return zyvoRootCache
+  if (process.env.ZYVO_SESSION_ROOT) {
+    zyvoRootCache = process.env.ZYVO_SESSION_ROOT
+  } else if (existsSync("/data/data/com.termux")) {
+    // Workers may not inherit env — try the shared-storage default. Without
+    // the storage permission, mkdir fails and we fall back to the private dir.
+    const fallback = "/storage/emulated/0/ZYVO"
+    try {
+      mkdirSync(fallback, { recursive: true })
+      zyvoRootCache = fallback
+    } catch {
+      zyvoRootCache = undefined
+    }
+  }
+  return zyvoRootCache
+}
+
 function zyvoDirFor(key: string[]): string | undefined {
-  const root = process.env.ZYVO_SESSION_ROOT
+  const root = zyvoRoot()
   if (!root) return undefined
   if (key[0] === "session" || key[0] === "project") return path.join(root, "storage")
   return undefined
@@ -79,7 +99,7 @@ function file(dir: string, key: string[]) {
 // ZYVO: mirror each session write into a human-named folder so sessions are
 // easy to spot in a file manager: <root>/sessions/<title-or-id>/info.json
 function zyvoMirrorTarget(target: string, content: unknown): string | undefined {
-  const root = process.env.ZYVO_SESSION_ROOT
+  const root = zyvoRoot()
   if (!root) return undefined
   if (!target.includes(`${path.sep}storage${path.sep}session${path.sep}`)) return undefined
   if (typeof content !== "object" || content === null) return undefined

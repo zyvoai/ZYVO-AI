@@ -14,14 +14,16 @@ const cache = path.join(xdgCache!, app)
 const config = path.join(xdgConfig!, app)
 const state = path.join(xdgState!, app)
 // On Android the default tmpdir is /tmp, which lives on a read-only rootfs.
-// Prefer an explicit override; on Termux fall back to $PREFIX/tmp (Termux
-// always exports PREFIX); only then os.tmpdir(). Chosen without relying on
-// the wrapper exporting anything, since env does not always survive.
-const tmpRoot =
-  process.env.OPENCODE_TMPDIR ??
-  (process.env.PREFIX && existsSync("/data/data/com.termux")
-    ? path.join(process.env.PREFIX, "tmp")
-    : os.tmpdir())
+// Workers spawned by the compiled binary may not inherit any environment, so
+// detect Termux from its constant app data path instead of relying on $PREFIX.
+function termuxPrefix(): string | undefined {
+  if (process.env.PREFIX) return process.env.PREFIX
+  if (existsSync("/data/data/com.termux")) return "/data/data/com.termux/files/usr"
+  return undefined
+}
+
+const prefix = termuxPrefix()
+const tmpRoot = process.env.OPENCODE_TMPDIR ?? (prefix ? path.join(prefix, "tmp") : os.tmpdir())
 const tmp = path.join(tmpRoot, app)
 
 const paths = {
