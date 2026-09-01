@@ -1,27 +1,13 @@
 export * as AISDK from "./aisdk"
 
-import { makeLocationNode } from "./effect/app-node"
 import type { LanguageModelV3 } from "@ai-sdk/provider"
-import { Cause, Context, Effect, Layer, Schema, Scope } from "effect"
+import { Cause, Context, Effect, Layer, Schema } from "effect"
 import { ModelV2 } from "./model"
+import { EventV2 } from "./event"
+import { PluginV2 } from "./plugin"
 import { ProviderV2 } from "./provider"
-import { State } from "./state"
 
 type SDK = any
-
-export interface SDKEvent {
-  readonly model: ModelV2.Info
-  readonly package: string
-  readonly options: Record<string, any>
-  sdk?: SDK
-}
-
-export interface LanguageEvent {
-  readonly model: ModelV2.Info
-  readonly sdk: SDK
-  readonly options: Record<string, any>
-  language?: LanguageModelV3
-}
 
 function wrapSSE(res: Response, ms: number, ctl: AbortController) {
   if (typeof ms !== "number" || ms <= 0) return res
@@ -123,7 +109,7 @@ function prepareOptions(model: ModelV2.Info, pkg: string) {
 
 export class InitError extends Schema.TaggedErrorClass<InitError>()("AISDK.InitError", {
   providerID: ProviderV2.ID,
-  cause: Schema.Defect(),
+  cause: Schema.Defect,
 }) {}
 
 function initError(providerID: ProviderV2.ID) {
@@ -131,70 +117,19 @@ function initError(providerID: ProviderV2.ID) {
 }
 
 export interface Interface {
-  readonly hook: {
-    readonly sdk: (
-      callback: (event: SDKEvent) => Effect.Effect<void> | void,
-    ) => Effect.Effect<State.Registration, never, Scope.Scope>
-    readonly language: (
-      callback: (event: LanguageEvent) => Effect.Effect<void> | void,
-    ) => Effect.Effect<State.Registration, never, Scope.Scope>
-  }
-  readonly runSDK: (event: SDKEvent) => Effect.Effect<SDKEvent>
-  readonly runLanguage: (event: LanguageEvent) => Effect.Effect<LanguageEvent>
   readonly language: (model: ModelV2.Info) => Effect.Effect<LanguageModelV3, InitError>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/v2/AISDK") {}
 
-export const locationLayer = Layer.effect(
+export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
-    let sdkHooks: ((event: SDKEvent) => Effect.Effect<void> | void)[] = []
-    let languageHooks: ((event: LanguageEvent) => Effect.Effect<void> | void)[] = []
+    const plugin = yield* PluginV2.Service
     const languages = new Map<string, LanguageModelV3>()
     const sdks = new Map<string, SDK>()
 
-    const register = <Event>(
-      hooks: () => ((event: Event) => Effect.Effect<void> | void)[],
-      update: (hooks: ((event: Event) => Effect.Effect<void> | void)[]) => void,
-    ) =>
-      Effect.fn("AISDK.hook")(function* (callback: (event: Event) => Effect.Effect<void> | void) {
-        const scope = yield* Scope.Scope
-        let active = true
-        update([...hooks(), callback])
-        const dispose = Effect.sync(() => {
-          if (!active) return
-          active = false
-          update(hooks().filter((item) => item !== callback))
-        })
-        yield* Scope.addFinalizer(scope, dispose)
-        return { dispose }
-      })
-
-    const run = Effect.fnUntraced(function* <Event>(
-      hooks: readonly ((event: Event) => Effect.Effect<void> | void)[],
-      event: Event,
-    ) {
-      for (const hook of hooks) {
-        const result = hook(event)
-        if (Effect.isEffect(result)) yield* result
-      }
-      return event
-    })
-
-    const service = Service.of({
-      hook: {
-        sdk: register(
-          () => sdkHooks,
-          (next) => (sdkHooks = next),
-        ),
-        language: register(
-          () => languageHooks,
-          (next) => (languageHooks = next),
-        ),
-      },
-      runSDK: (event) => run(sdkHooks, event),
-      runLanguage: (event) => run(languageHooks, event),
+    return Service.of({
       language: Effect.fn("AISDK.language")(function* (model) {
         const key = `${model.providerID}/${model.id}/${model.request.variant ?? "default"}`
         const existing = languages.get(key)
@@ -213,14 +148,26 @@ export const locationLayer = Layer.effect(
         })
         const sdk =
           sdks.get(sdkKey) ??
-          (yield* service.runSDK({ model, package: model.api.package, options }).pipe(initError(model.providerID))).sdk
+          (yield* plugin
+            .trigger("aisdk.sdk", { model, package: model.api.package, options }, {})
+            .pipe(initError(model.providerID))).sdk
         if (!sdk)
           return yield* new InitError({
             providerID: model.providerID,
             cause: new Error("No AISDK provider plugin returned an SDK"),
           })
         sdks.set(sdkKey, sdk)
-        const result = yield* service.runLanguage({ model, sdk, options }).pipe(initError(model.providerID))
+        const result = yield* plugin
+          .trigger(
+            "aisdk.language",
+            {
+              model,
+              sdk,
+              options,
+            },
+            {},
+          )
+          .pipe(initError(model.providerID))
         const language = yield* Effect.sync(() => result.language ?? sdk.languageModel(model.api.id)).pipe(
           initError(model.providerID),
         )
@@ -228,8 +175,7 @@ export const locationLayer = Layer.effect(
         return language
       }),
     })
-    return service
   }),
 )
 
-export const node = makeLocationNode({ service: Service, layer: locationLayer, deps: [] })
+export const defaultLayer = layer.pipe(Layer.provide(PluginV2.locationLayer.pipe(Layer.provide(EventV2.defaultLayer))))

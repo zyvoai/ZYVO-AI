@@ -1,7 +1,10 @@
+import { EventV2 } from "@opencode-ai/core/event"
 import { Schema } from "effect"
-import { ServerEvent } from "@opencode-ai/schema/server-event"
 
-export const Event = ServerEvent
+export const Event = {
+  Connected: EventV2.define({ type: "server.connected", schema: {} }),
+  Disposed: EventV2.define({ type: "global.disposed", schema: {} }),
+}
 
 export const InstanceDisposed = Schema.Struct({
   id: Schema.String,

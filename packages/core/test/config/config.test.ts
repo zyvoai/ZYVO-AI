@@ -5,8 +5,6 @@ import { Effect, Layer, Schema } from "effect"
 import { FastCheck } from "effect/testing"
 import { Config } from "@opencode-ai/core/config"
 import { ConfigProvider } from "@opencode-ai/core/config/provider"
-import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
-import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { ConfigMigrateV1 } from "@opencode-ai/core/v1/config/migrate"
 import { ConfigV1 } from "@opencode-ai/core/v1/config/config"
 import { FSUtil } from "@opencode-ai/core/fs-util"
@@ -27,19 +25,21 @@ function testLayer(
   projectDirectory = directory,
   vcs?: Project.Vcs,
 ) {
-  const locationLayer = Layer.succeed(
-    Location.Service,
-    Location.Service.of(
-      location(
-        { directory: AbsolutePath.make(directory) },
-        { projectDirectory: AbsolutePath.make(projectDirectory), vcs },
+  return Config.locationLayer.pipe(
+    Layer.provide(FSUtil.defaultLayer),
+    Layer.provide(Global.layerWith({ config: globalDirectory })),
+    Layer.provide(
+      Layer.succeed(
+        Location.Service,
+        Location.Service.of(
+          location(
+            { directory: AbsolutePath.make(directory) },
+            { projectDirectory: AbsolutePath.make(projectDirectory), vcs },
+          ),
+        ),
       ),
     ),
   )
-  return AppNodeBuilder.build(LayerNode.group([Config.node, Policy.node]), [
-    [Location.node, locationLayer],
-    [Global.node, Global.layerWith({ config: globalDirectory })],
-  ])
 }
 
 const provider = {
@@ -106,6 +106,7 @@ describe("Config", () => {
       expect(migrated.providers?.bedrock?.api).toEqual({
         type: "aisdk",
         package: "@ai-sdk/amazon-bedrock",
+        url: undefined,
         settings: { region: "us-east-1", profile: "dev" },
       })
       expect(migrated.providers?.bedrock?.request).toEqual({
@@ -161,7 +162,7 @@ describe("Config", () => {
     ),
   )
 
-  it.live("loads opencode JSON and JSONC files from lowest to highest priority", () =>
+  it.live("loads JSON and JSONC files from lowest to highest priority", () =>
     Effect.acquireRelease(
       Effect.promise(() => tmpdir()),
       (tmp) => Effect.promise(() => tmp[Symbol.asyncDispose]()),
@@ -171,8 +172,12 @@ describe("Config", () => {
           yield* Effect.promise(() =>
             Promise.all([
               fs.writeFile(
-                path.join(tmp.path, "opencode.json"),
+                path.join(tmp.path, "config.json"),
                 JSON.stringify({ $schema: "base", providers: { base: provider } }),
+              ),
+              fs.writeFile(
+                path.join(tmp.path, "opencode.json"),
+                JSON.stringify({ $schema: "middle", providers: { middle: provider } }),
               ),
               fs.writeFile(
                 path.join(tmp.path, "opencode.jsonc"),
@@ -188,12 +193,12 @@ describe("Config", () => {
             const config = yield* Config.Service
             const documents = (yield* config.entries()).filter((entry) => entry.type === "document")
 
-            expect(documents).toHaveLength(2)
-            expect(documents.map((document) => document.type)).toEqual(["document", "document"])
-            expect(documents.map((document) => document.info.$schema)).toEqual(["base", "last"])
+            expect(documents).toHaveLength(3)
+            expect(documents.map((document) => document.type)).toEqual(["document", "document", "document"])
+            expect(documents.map((document) => document.info.$schema)).toEqual(["base", "middle", "last"])
             expect(documents[0]).toBeInstanceOf(Config.Document)
-            expect(documents[0]?.path).toBe(path.join(tmp.path, "opencode.json"))
-            expect(documents[1]?.info.providers?.last).toBeInstanceOf(ConfigProvider.Info)
+            expect(documents[0]?.path).toBe(path.join(tmp.path, "config.json"))
+            expect(documents[2]?.info.providers?.last).toBeInstanceOf(ConfigProvider.Info)
 
             yield* Effect.promise(() =>
               fs.writeFile(path.join(tmp.path, "opencode.jsonc"), JSON.stringify({ $schema: "changed" })),
@@ -202,29 +207,7 @@ describe("Config", () => {
               (yield* config.entries())
                 .filter((entry) => entry.type === "document")
                 .map((document) => document.info.$schema),
-            ).toEqual(["base", "last"])
-          }).pipe(Effect.provide(testLayer(tmp.path)))
-        }),
-      ),
-    ),
-  )
-
-  it.live("does not load legacy config.json files", () =>
-    Effect.acquireRelease(
-      Effect.promise(() => tmpdir()),
-      (tmp) => Effect.promise(() => tmp[Symbol.asyncDispose]()),
-    ).pipe(
-      Effect.flatMap((tmp) =>
-        Effect.gen(function* () {
-          yield* Effect.promise(() =>
-            fs.writeFile(path.join(tmp.path, "config.json"), JSON.stringify({ $schema: "legacy" })),
-          )
-
-          return yield* Effect.gen(function* () {
-            const config = yield* Config.Service
-            const documents = (yield* config.entries()).filter((entry) => entry.type === "document")
-
-            expect(documents).toHaveLength(0)
+            ).toEqual(["base", "middle", "last"])
           }).pipe(Effect.provide(testLayer(tmp.path)))
         }),
       ),
@@ -316,14 +299,14 @@ describe("Config", () => {
                 },
                 tool_output: { max_lines: 1000, max_bytes: 32768 },
                 mcp: {
-                  timeout: { startup: 5000, request: 60000 },
+                  timeout: 5000,
                   servers: {
                     local: {
                       type: "local",
                       command: ["node", "./mcp/server.js"],
                       environment: { API_KEY: "secret" },
                       disabled: false,
-                      timeout: { request: 10000 },
+                      timeout: 10000,
                     },
                     remote: {
                       type: "remote",
@@ -331,7 +314,6 @@ describe("Config", () => {
                       headers: { Authorization: "Bearer token" },
                       oauth: { client_id: "client", scope: "read write", callback_port: 19876 },
                       disabled: true,
-                      timeout: { startup: 15000 },
                     },
                   },
                 },
@@ -402,14 +384,14 @@ describe("Config", () => {
             })
             expect(documents[0]?.info.tool_output).toEqual({ max_lines: 1000, max_bytes: 32768 })
             expect(documents[0]?.info.mcp).toEqual({
-              timeout: { startup: 5000, request: 60000 },
+              timeout: 5000,
               servers: {
                 local: {
                   type: "local",
                   command: ["node", "./mcp/server.js"],
                   environment: { API_KEY: "secret" },
                   disabled: false,
-                  timeout: { request: 10000 },
+                  timeout: 10000,
                 },
                 remote: {
                   type: "remote",
@@ -417,7 +399,6 @@ describe("Config", () => {
                   headers: { Authorization: "Bearer token" },
                   oauth: { client_id: "client", scope: "read write", callback_port: 19876 },
                   disabled: true,
-                  timeout: { startup: 15000 },
                 },
               },
             })
@@ -561,12 +542,11 @@ describe("Config", () => {
                 compaction: { auto: true, tail_turns: 3, preserve_recent_tokens: 2000, reserved: 10000 },
                 experimental: { mcp_timeout: 5000 },
                 mcp: {
-                  local: { type: "local", command: ["node", "server.js"], enabled: false, timeout: 10000 },
+                  local: { type: "local", command: ["node", "server.js"], enabled: false },
                   remote: {
                     type: "remote",
                     url: "https://mcp.example.com",
                     oauth: { clientId: "client", callbackPort: 19876 },
-                    timeout: 20000,
                   },
                 },
               }),
@@ -619,9 +599,9 @@ describe("Config", () => {
               models: {
                 model: {
                   request: {
-                    body: { temperature: 0.3, reasoning: { effort: "high" }, service_tier: "priority" },
+                    body: { temperature: 0.3, reasoningEffort: "high", serviceTier: "priority" },
                   },
-                  variants: [{ id: "high", body: { reasoning: { effort: "high", summary: "auto" } } }],
+                  variants: [{ id: "high", body: { reasoningEffort: "high", reasoningSummary: "auto" } }],
                 },
               },
             })
@@ -644,19 +624,13 @@ describe("Config", () => {
               buffer: 10000,
             })
             expect(documents[0]?.info.mcp).toMatchObject({
-              timeout: { request: 5000 },
+              timeout: 5000,
               servers: {
-                local: {
-                  type: "local",
-                  command: ["node", "server.js"],
-                  disabled: true,
-                  timeout: { request: 10000 },
-                },
+                local: { type: "local", command: ["node", "server.js"], disabled: true },
                 remote: {
                   type: "remote",
                   url: "https://mcp.example.com",
                   oauth: { client_id: "client", callback_port: 19876 },
-                  timeout: { request: 20000 },
                 },
               },
             })
@@ -666,7 +640,7 @@ describe("Config", () => {
     ),
   )
 
-  it.live("ignores an invalid file while loading valid config values", () =>
+  it.live("ignores invalid files while loading valid config values", () =>
     Effect.acquireRelease(
       Effect.promise(() => tmpdir()),
       (tmp) => Effect.promise(() => tmp[Symbol.asyncDispose]()),
@@ -675,8 +649,9 @@ describe("Config", () => {
         Effect.gen(function* () {
           yield* Effect.promise(() =>
             Promise.all([
-              fs.writeFile(path.join(tmp.path, "opencode.json"), JSON.stringify({ $schema: "base" })),
-              fs.writeFile(path.join(tmp.path, "opencode.jsonc"), "{ invalid"),
+              fs.writeFile(path.join(tmp.path, "config.json"), JSON.stringify({ $schema: "base" })),
+              fs.writeFile(path.join(tmp.path, "opencode.json"), "{ invalid"),
+              fs.writeFile(path.join(tmp.path, "opencode.jsonc"), JSON.stringify({ providers: { invalid: true } })),
             ]),
           )
           return yield* Effect.gen(function* () {
@@ -745,7 +720,7 @@ describe("Config", () => {
               fs.writeFile(path.join(global, "opencode.json"), JSON.stringify({ $schema: "global" })),
               fs.writeFile(path.join(root, "opencode.json"), JSON.stringify({ $schema: "root" })),
               fs.writeFile(path.join(parent, "opencode.jsonc"), JSON.stringify({ $schema: "parent" })),
-              fs.writeFile(path.join(directory, "opencode.json"), JSON.stringify({ $schema: "directory" })),
+              fs.writeFile(path.join(directory, "config.json"), JSON.stringify({ $schema: "directory" })),
               fs.writeFile(path.join(root, ".opencode", "opencode.json"), JSON.stringify({ $schema: "root-dot" })),
               fs.writeFile(
                 path.join(directory, ".opencode", "opencode.jsonc"),

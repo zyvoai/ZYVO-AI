@@ -1,12 +1,11 @@
+import { Config } from "@/config/config"
 import { ConfigV1 } from "@opencode-ai/core/v1/config/config"
 import { EventV2 } from "@opencode-ai/core/event"
-import { EventManifest } from "@/event-manifest"
 import { InstanceDisposed } from "@/server/event"
 import "@opencode-ai/core/account"
 import "@/server/event"
 import { Schema } from "effect"
-import { HttpApi, HttpApiEndpoint, HttpApiError, HttpApiGroup, OpenApi } from "effect/unstable/httpapi"
-import semver from "semver"
+import { HttpApi, HttpApiEndpoint, HttpApiError, HttpApiGroup, HttpApiSchema, OpenApi } from "effect/unstable/httpapi"
 import { described } from "./metadata"
 
 const GlobalHealth = Schema.Struct({
@@ -14,15 +13,16 @@ const GlobalHealth = Schema.Struct({
   version: Schema.String,
 })
 
-const SyncEventSchemas = EventManifest.Latest.values()
+const SyncEventSchemas = EventV2.registry
+  .values()
   .flatMap((definition) => {
-    if (!definition.durable) return []
+    if (!definition.sync) return []
     return [
       Schema.Struct({
         type: Schema.Literal("sync"),
         id: EventV2.ID,
         syncEvent: Schema.Struct({
-          type: Schema.Literal(EventV2.versionedType(definition.type, definition.durable.version)),
+          type: Schema.Literal(EventV2.versionedType(definition.type, definition.sync.version)),
           id: EventV2.ID,
           seq: Schema.Finite,
           aggregateID: Schema.String,
@@ -38,7 +38,8 @@ const GlobalEventSchema = Schema.Struct({
   project: Schema.optional(Schema.String),
   workspace: Schema.optional(Schema.String),
   payload: Schema.Union([
-    ...EventManifest.Latest.values()
+    ...EventV2.registry
+      .values()
       .map((definition) =>
         Schema.Struct({ id: EventV2.ID, type: Schema.Literal(definition.type), properties: definition.data }),
       )
@@ -49,9 +50,7 @@ const GlobalEventSchema = Schema.Struct({
 }).annotate({ identifier: "GlobalEvent" })
 
 export const GlobalUpgradeInput = Schema.Struct({
-  target: Schema.String.check(
-    Schema.makeFilter((value) => (semver.valid(value) === null ? "Expected a semantic version" : undefined)),
-  ),
+  target: Schema.optional(Schema.String),
 })
 
 const GlobalUpgradeResult = Schema.Union([
@@ -124,14 +123,14 @@ export const GlobalApi = HttpApi.make("global").add(
         }),
       ),
       HttpApiEndpoint.post("upgrade", GlobalPaths.upgrade, {
-        payload: GlobalUpgradeInput,
+        payload: [HttpApiSchema.NoContent, GlobalUpgradeInput],
         success: described(GlobalUpgradeResult, "Upgrade result"),
         error: HttpApiError.BadRequest,
       }).annotateMerge(
         OpenApi.annotations({
           identifier: "global.upgrade",
           summary: "Upgrade opencode",
-          description: "Upgrade opencode to the specified version.",
+          description: "Upgrade opencode to the specified version or latest if not specified.",
         }),
       ),
     )

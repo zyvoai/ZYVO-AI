@@ -1,6 +1,5 @@
 import { describe, expect } from "bun:test"
 import path from "path"
-import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { Effect, Exit, Layer } from "effect"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
@@ -12,7 +11,7 @@ import { testEffect } from "../lib/effect"
 
 const dir = path.join(Global.Path.data, "storage")
 
-const it = testEffect(LayerNode.compile(LayerNode.group([Storage.node, FSUtil.node, CrossSpawnSpawner.node])))
+const it = testEffect(Layer.mergeAll(Storage.defaultLayer, FSUtil.defaultLayer, CrossSpawnSpawner.defaultLayer))
 
 const scope = Effect.fnUntraced(function* () {
   const root = ["storage_test", crypto.randomUUID()]
@@ -51,14 +50,14 @@ function remappedFs(root: string) {
           fs.glob(pattern, options?.cwd ? { ...options, cwd: remap(root, options.cwd) } : options),
       })
     }),
-  ).pipe(Layer.provide(LayerNode.compile(FSUtil.node)))
+  ).pipe(Layer.provide(FSUtil.defaultLayer))
 }
 
 // Layer.fresh forces a new Storage instance — without it, Effect's in-test layer cache
 // returns the outer testEffect's Storage (which uses the real FSUtil), not a new
 // one built on top of remappedFs.
 const remappedStorage = (root: string) =>
-  Layer.fresh(LayerNode.compile(Storage.node, [[FSUtil.node, remappedFs(root)]]))
+  Layer.fresh(Storage.layer.pipe(Layer.provide(remappedFs(root)), Layer.provide(Git.defaultLayer)))
 
 describe("Storage", () => {
   it.live("round-trips JSON content", () =>

@@ -1,10 +1,10 @@
 import { describe, expect } from "bun:test"
-import { LayerNode } from "@opencode-ai/core/effect/layer-node"
-import { Effect, Fiber, Queue } from "effect"
+import { Effect, Fiber, Layer, Queue } from "effect"
 import { QuestionTool } from "../../src/tool/question"
 import { Question } from "../../src/question"
 import { SessionID, MessageID } from "../../src/session/schema"
 import { Agent } from "../../src/agent/agent"
+import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import { Truncate } from "@/tool/truncate"
 import { testEffect } from "../lib/effect"
 import { EventV2Bridge } from "../../src/event-v2-bridge"
@@ -21,7 +21,12 @@ const ctx = {
 }
 
 const it = testEffect(
-  LayerNode.compile(LayerNode.group([Question.node, EventV2Bridge.node, Truncate.node, Agent.node])),
+  Layer.mergeAll(
+    Question.layer.pipe(Layer.provideMerge(EventV2Bridge.defaultLayer)),
+    CrossSpawnSpawner.defaultLayer,
+    Truncate.defaultLayer,
+    Agent.defaultLayer,
+  ),
 )
 
 const pending = Effect.fn("QuestionToolTest.pending")(function* (question: Question.Interface) {

@@ -39,18 +39,8 @@ describe("ConfigProviderOptionsV1", () => {
       body: { store: true },
       settings: { timeout: 1000 },
     })
-    expect(
-      lowerer.request({
-        reasoningEffort: "high",
-        reasoningSummary: "auto",
-        reasoning: { encryptedContent: true },
-        textVerbosity: "low",
-        text: { outputFormat: "plain" },
-        nestedValue: { camelCase: true },
-      }),
-    ).toEqual({
-      reasoning: { encrypted_content: true, effort: "high", summary: "auto" },
-      text: { output_format: "plain", verbosity: "low" },
+    expect(lowerer.request({ reasoningEffort: "high", nestedValue: { camelCase: true } })).toEqual({
+      reasoning_effort: "high",
       nested_value: { camel_case: true },
     })
   })
@@ -140,10 +130,7 @@ describe("ConfigProviderOptionsV1", () => {
       body: { trace: true },
       settings: { resourceName: "resource" },
     })
-    expect(lowerer.request({ reasoningEffort: "high", reasoningSummary: "auto", textVerbosity: "low" })).toEqual({
-      reasoning: { effort: "high", summary: "auto" },
-      text: { verbosity: "low" },
-    })
+    expect(lowerer.request({ reasoningEffort: "high" })).toEqual({ reasoning_effort: "high" })
   })
 
   test("lowers Amazon Bedrock provider and request options", () => {

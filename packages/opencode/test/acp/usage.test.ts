@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test"
 import type { SessionNotification } from "@agentclientprotocol/sdk"
-import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { UsageService } from "@/acp/usage"
@@ -98,26 +97,24 @@ const fakeLayer = (input: {
   readonly messages?: Effect.Effect<readonly UsageService.SessionMessage[], unknown>
   readonly providers?: (directory: string) => Effect.Effect<Record<ProviderV2.ID, Provider.Info>, unknown>
 }) =>
-  LayerNode.compile(UsageService.node, [
-    [
-      UsageService.messageLoaderNode,
-      Layer.succeed(
-        UsageService.MessageLoader,
-        UsageService.MessageLoader.of({
-          messages: () => input.messages ?? Effect.succeed([]),
-        }),
+  UsageService.layer.pipe(
+    Layer.provide(
+      Layer.mergeAll(
+        Layer.succeed(
+          UsageService.MessageLoader,
+          UsageService.MessageLoader.of({
+            messages: () => input.messages ?? Effect.succeed([]),
+          }),
+        ),
+        Layer.succeed(
+          UsageService.ContextLimitLoader,
+          UsageService.ContextLimitLoader.of({
+            providers: input.providers ?? (() => Effect.succeed(providers())),
+          }),
+        ),
       ),
-    ],
-    [
-      UsageService.contextLimitLoaderNode,
-      Layer.succeed(
-        UsageService.ContextLimitLoader,
-        UsageService.ContextLimitLoader.of({
-          providers: input.providers ?? (() => Effect.succeed(providers())),
-        }),
-      ),
-    ],
-  ])
+    ),
+  )
 
 const connection = (updates: SessionNotification[]) => ({
   sessionUpdate(params: SessionNotification) {
@@ -207,7 +204,7 @@ describe("acp usage", () => {
     )
   })
 
-  it.effect("includes cache reads and writes in ACP context usage", () => {
+  it.effect("sends ACP usage_update with context size and cumulative assistant cost", () => {
     const updates: SessionNotification[] = []
     return Effect.gen(function* () {
       const usage = yield* UsageService.Service
@@ -222,7 +219,7 @@ describe("acp usage", () => {
           sessionId: "ses_1",
           update: {
             sessionUpdate: "usage_update",
-            used: 22,
+            used: 15,
             size: 128_000,
             cost: { amount: 3, currency: "USD" },
           },
@@ -239,7 +236,7 @@ describe("acp usage", () => {
                 input: 10,
                 output: 20,
                 reasoning: 0,
-                cache: { read: 5, write: 7 },
+                cache: { read: 5, write: 0 },
               },
             }),
           ]),

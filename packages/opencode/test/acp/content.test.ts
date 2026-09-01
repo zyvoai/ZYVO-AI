@@ -99,51 +99,17 @@ describe("acp content conversion", () => {
     ])
   })
 
-  test("resource with text becomes a sourced text part", () => {
-    const result = contentBlockToParts({
-      type: "resource",
-      resource: {
-        uri: "file:///tmp/context.txt#L12-L14",
-        mimeType: "text/plain",
-        text: "context",
-      },
-    })
-    expect(result).toHaveLength(1)
-    expect(result[0]?.type).toBe("text")
-    if (result[0]?.type === "text") {
-      expect(result[0].text.endsWith("\ncontext")).toBe(true)
-      expect(result[0].text.includes("context.txt")).toBe(true)
-      expect(result[0].text.includes("12")).toBe(true)
-    }
-  })
-
-  test("resource with text uses URI fallback for non-file resources", () => {
+  test("resource with text becomes a text part", () => {
     expect(
       contentBlockToParts({
         type: "resource",
         resource: {
-          uri: "mcp://server/context",
+          uri: "file:///tmp/context.txt",
+          mimeType: "text/plain",
           text: "context",
         },
       }),
-    ).toEqual([{ type: "text", text: "[mcp://server/context]\ncontext" }])
-  })
-
-  test("resource with text includes file path", () => {
-    const result = contentBlockToParts({
-      type: "resource",
-      resource: {
-        uri: "file:///tmp/context.txt",
-        mimeType: "text/plain",
-        text: "context",
-      },
-    })
-    expect(result).toHaveLength(1)
-    expect(result[0]?.type).toBe("text")
-    if (result[0]?.type === "text") {
-      expect(result[0].text.endsWith("\ncontext")).toBe(true)
-      expect(result[0].text.includes("context.txt")).toBe(true)
-    }
+    ).toEqual([{ type: "text", text: "context" }])
   })
 
   test("resource with blob and mimeType becomes a data URL file part", () => {

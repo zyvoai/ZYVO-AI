@@ -1,6 +1,5 @@
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { afterEach, describe, expect } from "bun:test"
-import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { Effect, Layer } from "effect"
 import path from "path"
 import { Agent } from "../../src/agent/agent"
@@ -57,9 +56,7 @@ const lsp = Layer.succeed(
 )
 
 const it = testEffect(
-  LayerNode.compile(LayerNode.group([Agent.node, FSUtil.node, CrossSpawnSpawner.node, Truncate.node, LSP.node]), [
-    [LSP.node, lsp],
-  ]),
+  Layer.mergeAll(Agent.defaultLayer, FSUtil.defaultLayer, CrossSpawnSpawner.defaultLayer, Truncate.defaultLayer, lsp),
 )
 
 const init = Effect.fn("LspToolTest.init")(function* () {

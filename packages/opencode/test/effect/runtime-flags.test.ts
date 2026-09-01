@@ -1,16 +1,15 @@
 import { describe, expect } from "bun:test"
 import { ConfigProvider, Effect, Layer } from "effect"
-import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
 import { RuntimeFlags } from "../../src/effect/runtime-flags"
 import { it } from "../lib/effect"
 
 const fromConfig = (input: Record<string, unknown>) =>
-  AppNodeBuilder.build(RuntimeFlags.node).pipe(Layer.provide(ConfigProvider.layer(ConfigProvider.fromUnknown(input))))
+  RuntimeFlags.defaultLayer.pipe(Layer.provide(ConfigProvider.layer(ConfigProvider.fromUnknown(input))))
 
 const readFlags = RuntimeFlags.Service.useSync((flags) => flags)
 
 describe("RuntimeFlags", () => {
-  it.effect("layer defaults autoShare to false", () =>
+  it.effect("defaultLayer defaults autoShare to false", () =>
     Effect.gen(function* () {
       const flags = yield* readFlags.pipe(Effect.provide(fromConfig({})))
 
@@ -18,7 +17,7 @@ describe("RuntimeFlags", () => {
     }),
   )
 
-  it.effect("layer parses plugin flags from the active ConfigProvider", () =>
+  it.effect("defaultLayer parses plugin flags from the active ConfigProvider", () =>
     Effect.gen(function* () {
       const flags = yield* readFlags.pipe(
         Effect.provide(
@@ -65,7 +64,7 @@ describe("RuntimeFlags", () => {
     }),
   )
 
-  it.effect("layer parses OPENCODE_EXPERIMENTAL_LSP_TY", () =>
+  it.effect("defaultLayer parses OPENCODE_EXPERIMENTAL_LSP_TY", () =>
     Effect.gen(function* () {
       const flags = yield* readFlags.pipe(
         Effect.provide(

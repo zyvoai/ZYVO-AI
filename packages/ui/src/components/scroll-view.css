@@ -1,14 +1,10 @@
 .scroll-view {
   position: relative;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
   overflow: hidden;
 }
 
 .scroll-view__viewport {
-  flex: 1 1 auto;
-  min-height: 0;
+  height: 100%;
   width: 100%;
   overflow-y: auto;
   scrollbar-width: none;
@@ -21,13 +17,12 @@
 
 .scroll-view__thumb {
   position: absolute;
-  inset-inline-end: 0;
+  right: 0;
   top: 0;
   width: 12px;
   transition: opacity 200ms ease;
   cursor: default;
   user-select: none;
-  pointer-events: auto;
   opacity: 0;
 }
 

@@ -50,7 +50,6 @@ describe("OpenAI Responses route", () => {
           { role: "system", content: "You are concise." },
           { role: "user", content: [{ type: "input_text", text: "Say hello." }] },
         ],
-        store: false,
         stream: true,
         max_output_tokens: 20,
         temperature: 0,
@@ -116,7 +115,6 @@ describe("OpenAI Responses route", () => {
           type: "function",
           name: "read",
           description: "Read a path or resource.",
-          strict: false,
           parameters: {
             type: "object",
             properties: {
@@ -162,16 +160,16 @@ describe("OpenAI Responses route", () => {
     Effect.gen(function* () {
       const prepared = yield* LLMClient.prepare(
         LLM.updateRequest(request, {
-          model: OpenAIResponses.webSocketRoute
-            .with({ endpoint: { baseURL: "https://api.openai.test/v1/" }, auth: Auth.bearer("test") })
-            .model({ id: "gpt-4.1-mini" }),
+          model: OpenAI.configure({ baseURL: "https://api.openai.test/v1/", apiKey: "test" }).responsesWebSocket(
+            "gpt-4.1-mini",
+          ),
         }),
       )
 
       expect(prepared.route).toBe("openai-responses-websocket")
       expect(prepared.protocol).toBe("openai-responses")
       expect(prepared.metadata).toEqual({ transport: "websocket-json" })
-      expect(prepared.body).toMatchObject({ model: "gpt-4.1-mini", store: false, stream: true })
+      expect(prepared.body).toMatchObject({ model: "gpt-4.1-mini", stream: true })
     }),
   )
 
@@ -357,72 +355,8 @@ describe("OpenAI Responses route", () => {
           { type: "function_call", call_id: "call_1", name: "lookup", arguments: '{"query":"weather"}' },
           { type: "function_call_output", call_id: "call_1", output: '{"forecast":"sunny"}' },
         ],
-        store: false,
         stream: true,
-        max_output_tokens: undefined,
-        temperature: undefined,
-        tool_choice: undefined,
-        tools: undefined,
-        top_p: undefined,
       })
-    }),
-  )
-
-  it.effect("preserves structured tool errors for the model", () =>
-    Effect.gen(function* () {
-      const error = {
-        error: { type: "unknown", message: "Tool execution interrupted" },
-        content: [],
-        structured: {},
-      }
-      const prepared = yield* LLMClient.prepare<OpenAIResponses.OpenAIResponsesBody>(
-        LLM.request({
-          model,
-          messages: [
-            Message.assistant([ToolCallPart.make({ id: "call_1", name: "bash", input: { command: "sleep 10" } })]),
-            Message.tool({
-              id: "call_1",
-              name: "bash",
-              resultType: "error",
-              result: error,
-            }),
-          ],
-        }),
-      )
-
-      expect(expectToolOutput(prepared.body).output).toBe(ProviderShared.encodeJson(error))
-    }),
-  )
-
-  it.effect("keeps primitive tool errors as plain text", () =>
-    Effect.gen(function* () {
-      const prepared = yield* LLMClient.prepare<OpenAIResponses.OpenAIResponsesBody>(
-        LLM.request({
-          model,
-          messages: [
-            Message.assistant([ToolCallPart.make({ id: "call_1", name: "bash", input: {} })]),
-            Message.tool({ id: "call_1", name: "bash", resultType: "error", result: 503 }),
-          ],
-        }),
-      )
-
-      expect(expectToolOutput(prepared.body).output).toBe("503")
-    }),
-  )
-
-  it.effect("keeps non-JSON tool errors as plain text", () =>
-    Effect.gen(function* () {
-      const prepared = yield* LLMClient.prepare<OpenAIResponses.OpenAIResponsesBody>(
-        LLM.request({
-          model,
-          messages: [
-            Message.assistant([ToolCallPart.make({ id: "call_1", name: "bash", input: {} })]),
-            Message.tool({ id: "call_1", name: "bash", resultType: "error", result: new Error("boom") }),
-          ],
-        }),
-      )
-
-      expect(expectToolOutput(prepared.body).output).toBe("Error: boom")
     }),
   )
 
@@ -526,6 +460,7 @@ describe("OpenAI Responses route", () => {
           },
           {
             type: "reasoning",
+            id: "rs_continuation_1",
             encrypted_content: "encrypted-continuation-state",
             summary: [{ type: "summary_text", text: "I inspected the previous turn." }],
           },
@@ -778,11 +713,6 @@ describe("OpenAI Responses route", () => {
         { type: "step-finish", index: 0, reason: "stop" },
         { type: "finish", reason: "stop" },
       ])
-      expect(response.events.filter((event) => event.type === "finish")).toHaveLength(1)
-      expect(response.message.content).toEqual([
-        { type: "reasoning", text: "thinking" },
-        { type: "text", text: "Hello" },
-      ])
     }),
   )
 
@@ -875,9 +805,7 @@ describe("OpenAI Responses route", () => {
 
   it.effect("closes reasoning summary parts when storage is not disabled", () =>
     Effect.gen(function* () {
-      const response = yield* LLMClient.generate(
-        LLM.updateRequest(request, { providerOptions: { openai: { store: true } } }),
-      ).pipe(
+      const response = yield* LLMClient.generate(request).pipe(
         Effect.provide(
           fixedResponse(
             sseEvents(
@@ -938,12 +866,12 @@ describe("OpenAI Responses route", () => {
           dynamicResponse((input) =>
             Effect.gen(function* () {
               const web = yield* HttpClientRequest.toWeb(input.request).pipe(Effect.orDie)
-              const body = yield* Effect.promise(() => web.json())
-              expect(body).toMatchObject({
+              expect(yield* Effect.promise(() => web.json())).toMatchObject({
                 input: [
                   { role: "user", content: [{ type: "input_text", text: "What changed?" }] },
                   {
                     type: "reasoning",
+                    id: "rs_1",
                     encrypted_content: "encrypted-state",
                     summary: [{ type: "summary_text", text: "Checked the previous diff." }],
                   },
@@ -951,7 +879,6 @@ describe("OpenAI Responses route", () => {
                   { role: "user", content: [{ type: "input_text", text: "Summarize it." }] },
                 ],
               })
-              expect(body.input[1]).not.toHaveProperty("id")
               return input.respond(
                 sseEvents(
                   { type: "response.output_text.delta", item_id: "msg_1", delta: "Parser now round-trips reasoning." },
@@ -998,6 +925,7 @@ describe("OpenAI Responses route", () => {
         { role: "assistant", content: [{ type: "output_text", text: "Before." }] },
         {
           type: "reasoning",
+          id: "rs_1",
           encrypted_content: "encrypted-state",
           summary: [{ type: "summary_text", text: "Checked order." }],
         },
@@ -1091,6 +1019,7 @@ describe("OpenAI Responses route", () => {
       expect(prepared.body.input).toEqual([
         {
           type: "reasoning",
+          id: "rs_1",
           encrypted_content: "encrypted-state",
           summary: [
             { type: "summary_text", text: "First" },

@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { LayerNode } from "@opencode-ai/core/effect/layer-node"
-import { Effect } from "effect"
+import { Effect, Layer } from "effect"
 import path from "path"
 import { unlink } from "fs/promises"
 import { Global } from "@opencode-ai/core/global"
@@ -13,7 +12,7 @@ import { testEffect } from "../lib/effect"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
 
-const it = testEffect(LayerNode.compile(LayerNode.group([Provider.node, Env.node])))
+const it = testEffect(Layer.mergeAll(Provider.defaultLayer, Env.defaultLayer))
 
 const originalEnv = new Map<string, string | undefined>()
 

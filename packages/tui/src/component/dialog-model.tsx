@@ -118,10 +118,7 @@ export function DialogModel(props: { providerID?: string }) {
 
     if (needle) {
       return [
-        ...sortModelOptions(
-          fuzzysort.go(needle, providerOptions, { keys: ["title", "category"] }).map((x) => x.obj),
-          false,
-        ),
+        ...fuzzysort.go(needle, providerOptions, { keys: ["title", "category"] }).map((x) => x.obj),
         ...fuzzysort.go(needle, popularProviders, { keys: ["title"] }).map((x) => x.obj),
       ]
     }
@@ -191,7 +188,6 @@ export function sortModelOptions<T extends { footer?: string; releaseDate: strin
   return sortBy(
     options,
     (option) => option.footer !== "Free",
-    [(option) => option.releaseDate, "desc"],
     (option) => option.title,
   )
 }

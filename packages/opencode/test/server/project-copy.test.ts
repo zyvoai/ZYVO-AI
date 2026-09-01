@@ -2,14 +2,12 @@ import { afterEach, describe, expect } from "bun:test"
 import { $ } from "bun"
 import fs from "fs/promises"
 import path from "path"
-import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
-import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { Effect, Layer } from "effect"
 import { HttpClientResponse } from "effect/unstable/http"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { Database } from "@opencode-ai/core/database/database"
 import { Snapshot } from "@/snapshot"
-import { InstanceBootstrap } from "@/project/bootstrap"
+import { InstanceBootstrap } from "@/project/bootstrap-service"
 import { InstanceStore } from "@/project/instance-store"
 import { resetDatabase } from "../fixture/db"
 import { disposeAllInstances, TestInstance } from "../fixture/fixture"
@@ -22,13 +20,9 @@ afterEach(async () => {
 })
 
 const noopBootstrap = Layer.succeed(InstanceBootstrap.Service, InstanceBootstrap.Service.of({ run: Effect.void }))
-const testInstanceStore = AppNodeBuilder.build(InstanceStore.node, [[InstanceStore.bootstrapNode, noopBootstrap]])
+const testInstanceStore = InstanceStore.defaultLayer.pipe(Layer.provide(noopBootstrap))
 const it = testEffect(
-  Layer.mergeAll(
-    AppNodeBuilder.build(LayerNode.group([FSUtil.node, Database.node, Snapshot.node])),
-    testInstanceStore,
-    httpApiLayer,
-  ),
+  Layer.mergeAll(FSUtil.defaultLayer, Database.defaultLayer, Snapshot.defaultLayer, testInstanceStore, httpApiLayer),
 )
 
 function request(directory: string, url: string, init: RequestInit = {}) {

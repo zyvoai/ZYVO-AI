@@ -1,15 +1,17 @@
 import { describe, expect } from "bun:test"
-import { Effect, Schema } from "effect"
+import { Effect, Layer, Schema } from "effect"
 import { Database } from "@opencode-ai/core/database/database"
-import { LayerNode } from "@opencode-ai/core/effect/layer-node"
-import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
+import { EventV2 } from "@opencode-ai/core/event"
 import { Project } from "@opencode-ai/core/project"
 import { ProjectDirectories } from "@opencode-ai/core/project/directories"
 import { ProjectTable } from "@opencode-ai/core/project/sql"
 import { AbsolutePath } from "@opencode-ai/core/schema"
 import { testEffect } from "./lib/effect"
 
-const it = testEffect(AppNodeBuilder.build(LayerNode.group([Database.node, ProjectDirectories.node])))
+const database = Database.layerFromPath(":memory:")
+const events = EventV2.layer.pipe(Layer.provide(database))
+const directories = ProjectDirectories.layer.pipe(Layer.provide(database), Layer.provide(events))
+const it = testEffect(Layer.mergeAll(database, events, directories))
 
 const projectID = Project.ID.make("project-directories")
 const directory = AbsolutePath.make("/tmp/project-directories")

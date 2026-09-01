@@ -1,18 +1,47 @@
 export * as AgentV2 from "./agent"
 
-import { makeLocationNode } from "./effect/app-node"
-import { Array, Context, Effect, Layer, Types } from "effect"
-import { Agent } from "@opencode-ai/schema/agent"
+import { Array, Context, Effect, Layer, Schema, Scope } from "effect"
+import { castDraft, enableMapSet, type Draft } from "immer"
+import { ModelV2 } from "./model"
+import { PermissionSchema } from "./permission/schema"
+import { ProviderV2 } from "./provider"
+import { PositiveInt } from "./schema"
 import { State } from "./state"
 
-export const ID = Agent.ID
+export const ID = Schema.String.pipe(Schema.brand("AgentV2.ID"))
 export type ID = typeof ID.Type
 export const defaultID = ID.make("build")
 
-export const Color = Agent.Color
+export const Color = Schema.Union([
+  Schema.String.check(Schema.isPattern(/^#[0-9a-fA-F]{6}$/)),
+  Schema.Literals(["primary", "secondary", "accent", "success", "warning", "error", "info"]),
+])
 
-export const Info = Agent.Info
-export type Info = Agent.Info
+export class Info extends Schema.Class<Info>("AgentV2.Info")({
+  id: ID,
+  model: ModelV2.Ref.pipe(Schema.optional),
+  request: ProviderV2.Request,
+  system: Schema.String.pipe(Schema.optional),
+  description: Schema.String.pipe(Schema.optional),
+  mode: Schema.Literals(["subagent", "primary", "all"]),
+  hidden: Schema.Boolean,
+  color: Color.pipe(Schema.optional),
+  steps: PositiveInt.pipe(Schema.optional),
+  permissions: PermissionSchema.Ruleset,
+}) {
+  static empty(id: ID) {
+    return new Info({
+      id,
+      request: {
+        headers: {},
+        body: {},
+      },
+      mode: "all",
+      hidden: false,
+      permissions: [],
+    })
+  }
+}
 
 export interface Selection {
   readonly id: ID
@@ -20,19 +49,21 @@ export interface Selection {
 }
 
 type Data = {
-  agents: Map<ID, Types.DeepMutable<Info>>
+  agents: Map<ID, Info>
   default?: ID
 }
 
-export type Draft = {
+export type Editor = {
   list: () => readonly Info[]
   get: (id: ID) => Info | undefined
   default: (id: ID | undefined) => void
-  update: (id: ID, fn: (agent: Types.DeepMutable<Info>) => void) => void
+  update: (id: ID, fn: (agent: Draft<Info>) => void) => void
   remove: (id: ID) => void
 }
 
-export interface Interface extends State.Transformable<Draft> {
+export interface Interface {
+  readonly transform: State.Interface<Data, Editor>["transform"]
+  readonly update: State.Interface<Data, Editor>["update"]
   readonly get: (id: ID) => Effect.Effect<Info | undefined>
   readonly default: () => Effect.Effect<Info | undefined>
   readonly resolve: (id?: ID | string) => Effect.Effect<Info | undefined>
@@ -42,19 +73,21 @@ export interface Interface extends State.Transformable<Draft> {
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/v2/Agent") {}
 
-const layer = Layer.effect(
+enableMapSet()
+
+export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
-    const state = State.create<Data, Draft>({
+    const state = State.create<Data, Editor>({
       initial: () => ({ agents: new Map() }),
-      draft: (draft) => ({
+      editor: (draft) => ({
         list: () => Array.fromIterable(draft.agents.values()) as Info[],
         get: (id) => draft.agents.get(id),
         default: (id) => {
           draft.default = id
         },
         update: (id, fn) => {
-          const current = draft.agents.get(id) ?? (Info.empty(id) as Types.DeepMutable<Info>)
+          const current = draft.agents.get(id) ?? castDraft(Info.empty(id))
           if (!draft.agents.has(id)) draft.agents.set(id, current)
           fn(current)
           current.id = id
@@ -80,7 +113,7 @@ const layer = Layer.effect(
 
     return Service.of({
       transform: state.transform,
-      reload: state.reload,
+      update: state.update,
       get: Effect.fn("AgentV2.get")(function* (id) {
         return state.get().agents.get(id)
       }),
@@ -107,5 +140,3 @@ const layer = Layer.effect(
 )
 
 export const locationLayer = layer
-
-export const node = makeLocationNode({ service: Service, layer, deps: [] })

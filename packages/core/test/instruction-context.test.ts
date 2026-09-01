@@ -2,8 +2,6 @@ import { describe, expect } from "bun:test"
 import { Effect, Layer } from "effect"
 import fs from "fs/promises"
 import path from "path"
-import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
-import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { Global } from "@opencode-ai/core/global"
 import { InstructionContext } from "@opencode-ai/core/instruction-context"
@@ -16,17 +14,6 @@ import { tmpdir } from "./fixture/tmpdir"
 import { testEffect } from "./lib/effect"
 
 const it = testEffect(Layer.empty)
-
-const instructionLayer = (input: {
-  config: string
-  locationServiceLayer: Layer.Layer<Location.Service>
-  filesystemLayer?: Layer.Layer<FSUtil.Service>
-}) =>
-  AppNodeBuilder.build(LayerNode.group([SystemContextRegistry.node, InstructionContext.node]), [
-    [Global.node, Global.layerWith({ config: input.config })],
-    [Location.node, input.locationServiceLayer],
-    ...(input.filesystemLayer ? [[FSUtil.node, input.filesystemLayer] as const] : []),
-  ])
 
 describe("InstructionContext", () => {
   it.live("loads global and upward project AGENTS.md files as one aggregate context", () =>
@@ -54,19 +41,19 @@ describe("InstructionContext", () => {
 
           const load = SystemContextRegistry.Service.pipe(
             Effect.flatMap((service) => service.load()),
+            Effect.provide(InstructionContext.layer.pipe(Layer.provideMerge(SystemContextRegistry.layer))),
+            Effect.provide(FSUtil.defaultLayer),
+            Effect.provide(Global.layerWith({ config: global })),
             Effect.provide(
-              instructionLayer({
-                config: global,
-                locationServiceLayer: Layer.succeed(
-                  Location.Service,
-                  Location.Service.of(
-                    location(
-                      { directory: AbsolutePath.make(directory) },
-                      { projectDirectory: AbsolutePath.make(project) },
-                    ),
+              Layer.succeed(
+                Location.Service,
+                Location.Service.of(
+                  location(
+                    { directory: AbsolutePath.make(directory) },
+                    { projectDirectory: AbsolutePath.make(project) },
                   ),
                 ),
-              }),
+              ),
             ),
           )
 
@@ -120,14 +107,14 @@ describe("InstructionContext", () => {
           yield* Effect.promise(() => fs.writeFile(file, ""))
           const context = yield* SystemContextRegistry.Service.pipe(
             Effect.flatMap((service) => service.load()),
+            Effect.provide(InstructionContext.layer.pipe(Layer.provideMerge(SystemContextRegistry.layer))),
+            Effect.provide(FSUtil.defaultLayer),
+            Effect.provide(Global.layerWith({ config: path.join(tmp.path, "global") })),
             Effect.provide(
-              instructionLayer({
-                config: path.join(tmp.path, "global"),
-                locationServiceLayer: Layer.succeed(
-                  Location.Service,
-                  Location.Service.of(location({ directory: AbsolutePath.make(tmp.path) })),
-                ),
-              }),
+              Layer.succeed(
+                Location.Service,
+                Location.Service.of(location({ directory: AbsolutePath.make(tmp.path) })),
+              ),
             ),
           )
 
@@ -146,18 +133,14 @@ describe("InstructionContext", () => {
             FSUtil.Service.of({ ...fs, up: () => Effect.fail(new FSUtil.FileSystemError({ method: "up" })) }),
           ),
         ),
-      ).pipe(Layer.provide(LayerNode.compile(FSUtil.node)))
+      ).pipe(Layer.provide(FSUtil.defaultLayer))
       const context = yield* SystemContextRegistry.Service.pipe(
         Effect.flatMap((service) => service.load()),
+        Effect.provide(InstructionContext.layer.pipe(Layer.provideMerge(SystemContextRegistry.layer))),
+        Effect.provide(failingFS),
+        Effect.provide(Global.layerWith({ config: "/global" })),
         Effect.provide(
-          instructionLayer({
-            config: "/global",
-            filesystemLayer: failingFS,
-            locationServiceLayer: Layer.succeed(
-              Location.Service,
-              Location.Service.of(location({ directory: AbsolutePath.make("/repo") })),
-            ),
-          }),
+          Layer.succeed(Location.Service, Location.Service.of(location({ directory: AbsolutePath.make("/repo") }))),
         ),
       )
 
@@ -186,18 +169,14 @@ describe("InstructionContext", () => {
             }),
           ),
         ),
-      ).pipe(Layer.provide(LayerNode.compile(FSUtil.node)))
+      ).pipe(Layer.provide(FSUtil.defaultLayer))
       const context = yield* SystemContextRegistry.Service.pipe(
         Effect.flatMap((service) => service.load()),
+        Effect.provide(InstructionContext.layer.pipe(Layer.provideMerge(SystemContextRegistry.layer))),
+        Effect.provide(racingFS),
+        Effect.provide(Global.layerWith({ config: "/global" })),
         Effect.provide(
-          instructionLayer({
-            config: "/global",
-            filesystemLayer: racingFS,
-            locationServiceLayer: Layer.succeed(
-              Location.Service,
-              Location.Service.of(location({ directory: AbsolutePath.make("/repo") })),
-            ),
-          }),
+          Layer.succeed(Location.Service, Location.Service.of(location({ directory: AbsolutePath.make("/repo") }))),
         ),
       )
 
@@ -229,21 +208,20 @@ describe("InstructionContext", () => {
             }),
           ),
         ),
-      ).pipe(Layer.provide(LayerNode.compile(FSUtil.node)))
+      ).pipe(Layer.provide(FSUtil.defaultLayer))
 
       yield* SystemContextRegistry.Service.pipe(
         Effect.flatMap((service) => service.load()),
+        Effect.provide(InstructionContext.layer.pipe(Layer.provideMerge(SystemContextRegistry.layer))),
+        Effect.provide(observingFS),
+        Effect.provide(Global.layerWith({ config: "/global" })),
         Effect.provide(
-          instructionLayer({
-            config: "/global",
-            filesystemLayer: observingFS,
-            locationServiceLayer: Layer.succeed(
-              Location.Service,
-              Location.Service.of(
-                location({ directory: AbsolutePath.make("/repo/") }, { projectDirectory: AbsolutePath.make("/repo") }),
-              ),
+          Layer.succeed(
+            Location.Service,
+            Location.Service.of(
+              location({ directory: AbsolutePath.make("/repo/") }, { projectDirectory: AbsolutePath.make("/repo") }),
             ),
-          }),
+          ),
         ),
       )
 
@@ -263,20 +241,18 @@ describe("InstructionContext", () => {
 
       yield* SystemContextRegistry.Service.pipe(
         Effect.flatMap((service) => service.load()),
+        Effect.provide(InstructionContext.layer.pipe(Layer.provideMerge(SystemContextRegistry.layer))),
         Effect.provide(
-          instructionLayer({
-            config: "/global",
-            filesystemLayer: Layer.effect(
-              FSUtil.Service,
-              FSUtil.Service.pipe(
-                Effect.map((fs) => FSUtil.Service.of({ ...fs, up: () => Effect.sync(() => ((scanned = true), [])) })),
-              ),
-            ).pipe(Layer.provide(LayerNode.compile(FSUtil.node))),
-            locationServiceLayer: Layer.succeed(
-              Location.Service,
-              Location.Service.of(location({ directory: AbsolutePath.make("/repo") })),
+          Layer.effect(
+            FSUtil.Service,
+            FSUtil.Service.pipe(
+              Effect.map((fs) => FSUtil.Service.of({ ...fs, up: () => Effect.sync(() => ((scanned = true), [])) })),
             ),
-          }),
+          ).pipe(Layer.provide(FSUtil.defaultLayer)),
+        ),
+        Effect.provide(Global.layerWith({ config: "/global" })),
+        Effect.provide(
+          Layer.succeed(Location.Service, Location.Service.of(location({ directory: AbsolutePath.make("/repo") }))),
         ),
         Effect.ensuring(
           Effect.sync(() => {
@@ -295,25 +271,23 @@ describe("InstructionContext", () => {
       let scanned = false
       yield* SystemContextRegistry.Service.pipe(
         Effect.flatMap((service) => service.load()),
+        Effect.provide(InstructionContext.layer.pipe(Layer.provideMerge(SystemContextRegistry.layer))),
         Effect.provide(
-          instructionLayer({
-            config: "/global",
-            filesystemLayer: Layer.effect(
-              FSUtil.Service,
-              FSUtil.Service.pipe(
-                Effect.map((fs) => FSUtil.Service.of({ ...fs, up: () => Effect.sync(() => ((scanned = true), [])) })),
-              ),
-            ).pipe(Layer.provide(LayerNode.compile(FSUtil.node))),
-            locationServiceLayer: Layer.succeed(
-              Location.Service,
-              Location.Service.of(
-                location(
-                  { directory: AbsolutePath.make("/outside") },
-                  { projectDirectory: AbsolutePath.make("/repo") },
-                ),
-              ),
+          Layer.effect(
+            FSUtil.Service,
+            FSUtil.Service.pipe(
+              Effect.map((fs) => FSUtil.Service.of({ ...fs, up: () => Effect.sync(() => ((scanned = true), [])) })),
             ),
-          }),
+          ).pipe(Layer.provide(FSUtil.defaultLayer)),
+        ),
+        Effect.provide(Global.layerWith({ config: "/global" })),
+        Effect.provide(
+          Layer.succeed(
+            Location.Service,
+            Location.Service.of(
+              location({ directory: AbsolutePath.make("/outside") }, { projectDirectory: AbsolutePath.make("/repo") }),
+            ),
+          ),
         ),
       )
 

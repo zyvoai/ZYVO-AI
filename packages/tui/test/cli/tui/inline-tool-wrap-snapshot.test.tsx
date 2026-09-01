@@ -62,6 +62,7 @@ function ShellOutput() {
       paddingLeft={2}
       gap={1}
     >
+      <text paddingLeft={3}># List files</text>
       <box gap={1}>
         <text>$ ls</text>
         <text>file.ts</text>

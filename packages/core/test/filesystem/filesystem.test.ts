@@ -1,12 +1,11 @@
 import { describe, test, expect } from "bun:test"
-import { Effect, FileSystem } from "effect"
-import { LayerNodePlatform } from "@opencode-ai/core/effect/app-node-platform"
-import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+import { Effect, Layer, FileSystem } from "effect"
+import { NodeFileSystem } from "@effect/platform-node"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { testEffect } from "../lib/effect"
 import path from "path"
 
-const live = LayerNode.compile(LayerNode.group([FSUtil.node, LayerNodePlatform.filesystem]))
+const live = FSUtil.layer.pipe(Layer.provideMerge(NodeFileSystem.layer))
 const { effect: it } = testEffect(live)
 
 describe("FSUtil", () => {

@@ -48,6 +48,12 @@ else
   info "ripgrep already installed"
 fi
 
+# zyvo: session folders live on shared storage — request access once
+if [ ! -d "$HOME/storage/shared" ] && command -v termux-setup-storage >/dev/null 2>&1; then
+  info "Requesting storage permission — press ALLOW in the dialog (sessions will appear in /storage/emulated/0/ZYVO)"
+  termux-setup-storage || true
+fi
+
 # ---------------------------------------------------------------
 # 3. Resolve the latest release asset
 # ---------------------------------------------------------------

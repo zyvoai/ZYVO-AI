@@ -45,7 +45,6 @@ export class Service extends ConfigService.Service<Service>()("@opencode/Runtime
   experimentalLspTool: enabledByExperimental("OPENCODE_EXPERIMENTAL_LSP_TOOL"),
   experimentalOxfmt: enabledByExperimental("OPENCODE_EXPERIMENTAL_OXFMT"),
   experimentalPlanMode: enabledByExperimental("OPENCODE_EXPERIMENTAL_PLAN_MODE"),
-  experimentalCodeMode: enabledByExperimental("OPENCODE_EXPERIMENTAL_CODE_MODE"),
   experimentalEventSystem: enabledByExperimental("OPENCODE_EXPERIMENTAL_EVENT_SYSTEM"),
   experimentalWorkspaces: enabledByExperimental("OPENCODE_EXPERIMENTAL_WORKSPACES"),
   experimentalIconDiscovery: enabledByExperimental("OPENCODE_EXPERIMENTAL_ICON_DISCOVERY"),
@@ -58,7 +57,7 @@ export class Service extends ConfigService.Service<Service>()("@opencode/Runtime
 
 export type Info = Context.Service.Shape<typeof Service>
 
-const emptyConfigLayer = Service.layer.pipe(
+const emptyConfigLayer = Service.defaultLayer.pipe(
   Layer.provide(ConfigProvider.layer(ConfigProvider.fromUnknown({}))),
   Layer.orDie,
 )
@@ -72,7 +71,9 @@ export const layer = (overrides: Partial<Info> = {}) =>
     }),
   ).pipe(Layer.provide(emptyConfigLayer))
 
-export const node = LayerNode.make({ service: Service, layer: Service.layer.pipe(Layer.orDie), deps: [] })
+export const defaultLayer = Service.defaultLayer.pipe(Layer.orDie)
+
+export const node = LayerNode.make(defaultLayer, [])
 
 export * as RuntimeFlags from "./runtime-flags"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"

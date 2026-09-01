@@ -1,4 +1,5 @@
 import path from "path"
+import { pathToFileURL } from "url"
 import { Effect, Schema } from "effect"
 import { Ripgrep } from "@opencode-ai/core/ripgrep"
 import { Skill } from "../skill"
@@ -32,7 +33,7 @@ export const SkillTool = Tool.define(
           })
 
           const dir = path.dirname(info.location)
-          const base = dir
+          const base = pathToFileURL(dir).href
           const files = yield* ripgrep.find({
             cwd: dir,
             pattern: "!**/SKILL.md",

@@ -1,5 +1,4 @@
 import { Schema } from "effect"
-import { ToolContent, ToolFileContent, ToolTextContent } from "@opencode-ai/schema/llm"
 import { JsonSchema, MessageRole, ProviderMetadata } from "./ids"
 import { CacheHint, CachePolicy, GenerationOptions, HttpOptions, ModelSchema, ProviderOptions } from "./options"
 import { isRecord } from "../utils/record"
@@ -40,7 +39,23 @@ export const MediaPart = Schema.Struct({
 }).annotate({ identifier: "LLM.Content.Media" })
 export type MediaPart = Schema.Schema.Type<typeof MediaPart>
 
-export { ToolContent, ToolFileContent, ToolTextContent }
+export const ToolTextContent = Schema.Struct({
+  type: Schema.Literal("text"),
+  text: Schema.String,
+}).annotate({ identifier: "Tool.TextContent" })
+export type ToolTextContent = typeof ToolTextContent.Type
+
+export const ToolFileContent = Schema.Struct({
+  type: Schema.Literal("file"),
+  uri: Schema.String,
+  mime: Schema.String,
+  name: Schema.optional(Schema.String),
+}).annotate({ identifier: "Tool.FileContent" })
+export type ToolFileContent = typeof ToolFileContent.Type
+
+/** Ordered, provider-independent content shown to models and UIs after a tool succeeds. */
+export const ToolContent = Schema.Union([ToolTextContent, ToolFileContent]).pipe(Schema.toTaggedUnion("type"))
+export type ToolContent = Schema.Schema.Type<typeof ToolContent>
 
 const isToolResultValue = (value: unknown): value is ToolResultValue =>
   isRecord(value) &&

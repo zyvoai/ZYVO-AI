@@ -1,11 +1,14 @@
 import { describe, expect } from "bun:test"
-import { Effect } from "effect"
+import { Effect, Layer } from "effect"
+import { FetchHttpClient } from "effect/unstable/http"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
-import { Npm } from "@opencode-ai/core/npm"
+import { FSUtil } from "@opencode-ai/core/fs-util"
+import { EffectFlock } from "@opencode-ai/core/util/effect-flock"
 import path from "path"
 import { pathToFileURL } from "url"
-import { Account } from "../../src/account/account"
-import { Auth } from "../../src/auth"
+import { EventV2Bridge } from "../../src/event-v2-bridge"
+import { Config } from "../../src/config/config"
+import { Env } from "../../src/env"
 import { RuntimeFlags } from "../../src/effect/runtime-flags"
 import { Plugin } from "../../src/plugin/index"
 
@@ -16,16 +19,25 @@ import { AuthTest } from "../fake/auth"
 import { NpmTest } from "../fake/npm"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
-import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
-import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 
+const configLayer = Config.layer.pipe(
+  Layer.provide(EffectFlock.defaultLayer),
+  Layer.provide(FSUtil.defaultLayer),
+  Layer.provide(Env.defaultLayer),
+  Layer.provide(AuthTest.empty),
+  Layer.provide(AccountTest.empty),
+  Layer.provide(NpmTest.noop),
+  Layer.provide(FetchHttpClient.layer),
+)
 const it = testEffect(
-  AppNodeBuilder.build(LayerNode.group([Plugin.node, CrossSpawnSpawner.node]), [
-    [Auth.node, AuthTest.empty],
-    [Account.node, AccountTest.empty],
-    [Npm.node, NpmTest.noop],
-    [RuntimeFlags.node, RuntimeFlags.layer({ disableDefaultPlugins: true })],
-  ]),
+  Layer.mergeAll(
+    Plugin.layer.pipe(
+      Layer.provide(EventV2Bridge.defaultLayer),
+      Layer.provide(configLayer),
+      Layer.provide(RuntimeFlags.layer({ disableDefaultPlugins: true })),
+    ),
+    CrossSpawnSpawner.defaultLayer,
+  ),
 )
 const systemHook = "experimental.chat.system.transform"
 

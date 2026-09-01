@@ -1,7 +1,6 @@
 export * as Observability from "./observability"
 
 import { NodeFileSystem } from "@effect/platform-node"
-import { LayerNode } from "./effect/layer-node"
 import { Effect, Layer, Logger, References } from "effect"
 import { FetchHttpClient } from "effect/unstable/http"
 import { OtlpSerialization } from "effect/unstable/observability"
@@ -20,5 +19,3 @@ export const layer = Layer.unwrap(
     return Layer.merge(logs, yield* Effect.promise(Otlp.tracingLayer))
   }),
 )
-
-export const node = LayerNode.make({ name: "observability", layer, deps: [] })

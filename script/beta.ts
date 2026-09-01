@@ -3,7 +3,7 @@
 import { $ } from "bun"
 import fs from "fs/promises"
 
-const model = "opencode/deepseek-v4-flash"
+const model = "opencode/gpt-5.3-codex"
 
 interface PR {
   number: number
@@ -86,7 +86,7 @@ async function build() {
   console.log("  Running final build smoke check...")
 
   try {
-    await $`./script/build.ts --single`.cwd("packages/cli")
+    await $`./script/build.ts --single`.cwd("packages/opencode")
     return true
   } catch (err) {
     console.log(`Build failed: ${err}`)
@@ -200,7 +200,7 @@ async function smoke(prs: PR[], applied: number[]) {
     "The beta merge batch is complete, but the deterministic final smoke check failed.",
     `Merged PRs on HEAD:\n${done}`,
     "Run `bun typecheck` at the repo root.",
-    "Run `./script/build.ts --single` in `packages/cli`.",
+    "Run `./script/build.ts --single` in `packages/opencode`.",
     "Fix any merge-caused issues until both commands pass.",
     "Do not create a commit.",
   ].join("\n")
@@ -216,27 +216,25 @@ async function smoke(prs: PR[], applied: number[]) {
   return commitSmokeChanges()
 }
 
-async function checkout() {
-  console.log("Fetching latest v2 branch...")
-  await $`git fetch origin v2`
-
-  console.log("Checking out beta branch...")
-  await $`git checkout -B beta origin/v2`
-
-  console.log("Installing v2 dependencies...")
-  await $`bun install --frozen-lockfile`
-}
-
 async function main() {
   console.log("Fetching open PRs with beta label...")
 
   const stdout =
-    await $`gh pr list --state open --draft=false --base v2 --label beta --json number,title,author,labels --limit 100`.text()
+    await $`gh pr list --state open --draft=false --label beta --json number,title,author,labels --limit 100`.text()
   const prs: PR[] = JSON.parse(stdout).sort((a: PR, b: PR) => a.number - b.number)
 
   console.log(`Found ${prs.length} open PRs with beta label`)
 
-  await checkout()
+  if (prs.length === 0) {
+    console.log("No team PRs to merge")
+    return
+  }
+
+  console.log("Fetching latest dev branch...")
+  await $`git fetch origin dev`
+
+  console.log("Checking out beta branch...")
+  await $`git checkout -B beta origin/dev`
 
   const applied: number[] = []
   const failed: FailedPR[] = []
@@ -264,7 +262,7 @@ async function main() {
         if (!(await fix(pr, files, prs, applied, idx))) {
           await cleanup()
           failed.push({ number: pr.number, title: pr.title, reason: "Merge conflicts" })
-          await commentOnPR(pr.number, "Merge conflicts with v2 branch")
+          await commentOnPR(pr.number, "Merge conflicts with dev branch")
           continue
         }
       } else {
@@ -320,7 +318,7 @@ async function main() {
   await $`git fetch origin beta`
 
   const localTree = (await $`git rev-parse beta^{tree}`.text()).trim()
-  const remoteTrees = (await $`git log origin/v2..origin/beta --format=%T`.text()).split("\n")
+  const remoteTrees = (await $`git log origin/dev..origin/beta --format=%T`.text()).split("\n")
 
   const matchIdx = remoteTrees.indexOf(localTree)
   if (matchIdx !== -1) {
@@ -337,7 +335,7 @@ async function main() {
   await $`git fetch origin beta`
 
   const validatedTree = (await $`git rev-parse beta^{tree}`.text()).trim()
-  const remoteTreesAfterSmoke = (await $`git log origin/v2..origin/beta --format=%T`.text()).split("\n")
+  const remoteTreesAfterSmoke = (await $`git log origin/dev..origin/beta --format=%T`.text()).split("\n")
   const matchIdxAfterSmoke = remoteTreesAfterSmoke.indexOf(validatedTree)
   if (matchIdxAfterSmoke !== -1) {
     if (matchIdxAfterSmoke !== 0) {

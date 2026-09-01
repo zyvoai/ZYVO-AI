@@ -30,10 +30,8 @@ import { VercelPlugin } from "./provider/vercel"
 import { VenicePlugin } from "./provider/venice"
 import { XAIPlugin } from "./provider/xai"
 import { ZenmuxPlugin } from "./provider/zenmux"
-import type { PluginInternal } from "./internal"
-import type { Scope } from "effect"
 
-export const ProviderPlugins: PluginInternal.Plugin<PluginInternal.Requirements | Scope.Scope>[] = [
+export const ProviderPlugins = [
   AlibabaPlugin,
   AmazonBedrockPlugin,
   AnthropicPlugin,

@@ -9,7 +9,6 @@ import { ProxyEnv } from "@/util/proxy-env"
 import { isRecord } from "@/util/record"
 
 export const PROTOCOL_HEADER = "responses_websockets=2026-02-06"
-export const MESSAGE_TOO_BIG_CLOSE_CODE = 1009
 
 export interface ConnectResponsesWebSocketOptions {
   url: string
@@ -27,7 +26,7 @@ export interface StreamResponsesWebSocketOptions {
   onComplete?: (event: Record<string, unknown>) => void
   onTerminal?: (event: Record<string, unknown>) => void
   onRetryableTerminal?: (event: Record<string, unknown>) => Promise<WebSocket | undefined>
-  onConnectionInvalid?: (error: ProviderError.ResponseStreamError, closeCode?: number) => void
+  onConnectionInvalid?: (error: ProviderError.ResponseStreamError) => void
   onAbort?: (error: Error) => void
 }
 
@@ -163,11 +162,11 @@ export function streamResponsesWebSocket(options: StreamResponsesWebSocketOption
     controller?.close()
   }
 
-  function invalidate(error: ProviderError.ResponseStreamError, closeCode?: number) {
+  function invalidate(error: ProviderError.ResponseStreamError) {
     if (completed) return
     completed = true
     cleanup()
-    options.onConnectionInvalid?.(error, closeCode)
+    options.onConnectionInvalid?.(error)
     controller?.error(error)
   }
 
@@ -275,7 +274,6 @@ export function streamResponsesWebSocket(options: StreamResponsesWebSocketOption
     if (completed) return
     invalidate(
       new ProviderError.ResponseStreamError(closeMessage("WebSocket closed before response.completed", code, reason)),
-      code,
     )
   }
 
@@ -375,7 +373,7 @@ function abortError(signal: AbortSignal | undefined) {
 
 function closeMessage(message: string, code: number, reason: Buffer) {
   const details = [`code ${code}`]
-  if (code === MESSAGE_TOO_BIG_CLOSE_CODE) details.push("message too big")
+  if (code === 1009) details.push("message too big")
   if (reason.length > 0) details.push(reason.toString())
   return `${message} (${details.join(": ")})`
 }

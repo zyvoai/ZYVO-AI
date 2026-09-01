@@ -2,8 +2,10 @@ export * as Ripgrep from "./ripgrep"
 
 import { Context, Effect, Fiber, Layer, Schema, Stream } from "effect"
 import { ChildProcess } from "effect/unstable/process"
-import { Entry, Match } from "@opencode-ai/schema/filesystem"
-import { makeGlobalNode } from "./effect/app-node"
+import path from "path"
+import { LayerNode } from "./effect/layer-node"
+import { Entry, Match } from "./filesystem/schema"
+import { FSUtil } from "./fs-util"
 import { AppProcess, collectStream, waitForAbort } from "./process"
 import { NonNegativeInt, PositiveInt, RelativePath } from "./schema"
 import { RipgrepBinary } from "./ripgrep/binary"
@@ -40,7 +42,7 @@ type RawMatchData = (typeof RawMatch.Type)["data"]
 
 export class Error extends Schema.TaggedErrorClass<Error>()("Ripgrep.Error", {
   message: Schema.String,
-  cause: Schema.optional(Schema.Defect()),
+  cause: Schema.optional(Schema.Defect),
 }) {}
 
 export class InvalidPatternError extends Schema.TaggedErrorClass<InvalidPatternError>()("Ripgrep.InvalidPatternError", {
@@ -89,7 +91,7 @@ const failure = (message: string, cause?: unknown) => new Error({ message, cause
 const isInvalidPattern = (stderr: string) =>
   stderr.includes("regex parse error") || stderr.includes("error parsing regex")
 
-const layer = Layer.effect(
+export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const process = yield* AppProcess.Service
@@ -175,12 +177,14 @@ const layer = Layer.effect(
             ),
         }).pipe(
           Effect.map((result) =>
-            result.items.map((relative) =>
-              Entry.make({
+            result.items.map((relative) => {
+              const absolute = path.resolve(input.cwd, relative)
+              return new Entry({
                 path: RelativePath.make(relative),
                 type: "file",
-              }),
-            ),
+                mime: FSUtil.mimeType(absolute),
+              })
+            }),
           ),
           Effect.catchTag("Ripgrep.InvalidPatternError", (cause) => Effect.fail(failure(cause.message, cause))),
         ),
@@ -204,9 +208,10 @@ const layer = Layer.effect(
               .replace(/^[\\/]+/u, "")
               .replaceAll("\\", "/")
             return Effect.succeed(
-              Entry.make({
+              new Entry({
                 path: RelativePath.make(relative),
                 type: "file",
+                mime: FSUtil.mimeType(path.resolve(input.cwd, relative)),
               }),
             )
           },
@@ -257,17 +262,16 @@ const layer = Layer.effect(
                 .replace(/^(?:\.[\\/])+/u, "")
                 .replace(/^[\\/]+/u, "")
                 .replaceAll("\\", "/")
-              return Match.make({
-                entry: Entry.make({
+              const absolute = path.resolve(input.cwd, relative)
+              return new Match({
+                entry: new Entry({
                   path: RelativePath.make(relative),
                   type: "file",
+                  mime: FSUtil.mimeType(absolute),
                 }),
                 line: match.line_number,
                 offset: match.absolute_offset,
-                text:
-                  match.lines.text.length > 2_000
-                    ? match.lines.text.slice(0, 2_000).replace(/[\uD800-\uDBFF]$/, "") + "..."
-                    : match.lines.text,
+                text: match.lines.text.length > 2_000 ? match.lines.text.slice(0, 2_000) + "..." : match.lines.text,
                 submatches: match.submatches.map((submatch) => ({
                   text: submatch.match.text,
                   start: submatch.start,
@@ -281,4 +285,5 @@ const layer = Layer.effect(
   }),
 )
 
-export const node = makeGlobalNode({ service: Service, layer: layer, deps: [RipgrepBinary.node, AppProcess.node] })
+export const defaultLayer = layer.pipe(Layer.provide(Layer.merge(RipgrepBinary.defaultLayer, AppProcess.defaultLayer)))
+export const node = LayerNode.make(layer, [RipgrepBinary.node, AppProcess.node])

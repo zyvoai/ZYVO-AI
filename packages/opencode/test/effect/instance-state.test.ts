@@ -1,6 +1,5 @@
 import { expect } from "bun:test"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
-import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { $ } from "bun"
 import { Context, Deferred, Duration, Effect, Exit, Fiber, Layer } from "effect"
 import { InstanceState } from "@/effect/instance-state"
@@ -13,7 +12,7 @@ import {
 } from "../fixture/fixture"
 import { testEffect } from "../lib/effect"
 
-const it = testEffect(Layer.mergeAll(LayerNode.compile(CrossSpawnSpawner.node), testInstanceStoreLayer))
+const it = testEffect(Layer.mergeAll(CrossSpawnSpawner.defaultLayer, testInstanceStoreLayer))
 
 const access = <A, E>(state: InstanceState.InstanceState<A, E>, dir: string) =>
   InstanceState.get(state).pipe(provideInstanceEffect(dir))

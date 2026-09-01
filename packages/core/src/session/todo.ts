@@ -1,17 +1,30 @@
 export * as SessionTodo from "./todo"
 
 import { asc, eq } from "drizzle-orm"
-import { Context, Effect, Layer } from "effect"
-import { SessionTodo } from "@opencode-ai/schema/session-todo"
+import { Context, Effect, Layer, Schema } from "effect"
 import { Database } from "../database/database"
-import { makeLocationNode } from "../effect/app-node"
 import { EventV2 } from "../event"
 import { SessionSchema } from "./schema"
 import { TodoTable } from "./sql"
 
-export const Info = SessionTodo.Info
+export const Info = Schema.Struct({
+  content: Schema.String.annotate({ description: "Brief description of the task" }),
+  status: Schema.String.annotate({
+    description: "Current status of the task: pending, in_progress, completed, cancelled",
+  }),
+  priority: Schema.String.annotate({ description: "Priority level of the task: high, medium, low" }),
+}).annotate({ identifier: "SessionTodo.Info" })
 export type Info = typeof Info.Type
-export const Event = SessionTodo.Event
+
+export const Event = {
+  Updated: EventV2.define({
+    type: "todo.updated",
+    schema: {
+      sessionID: SessionSchema.ID,
+      todos: Schema.Array(Info),
+    },
+  }),
+}
 
 export interface Interface {
   readonly update: (input: {
@@ -23,7 +36,7 @@ export interface Interface {
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/v2/SessionTodo") {}
 
-const layer = Layer.effect(
+export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const { db } = yield* Database.Service
@@ -75,4 +88,4 @@ const layer = Layer.effect(
   }),
 )
 
-export const node = makeLocationNode({ service: Service, layer, deps: [EventV2.node, Database.node] })
+export const defaultLayer = layer.pipe(Layer.provide(EventV2.defaultLayer), Layer.provide(Database.defaultLayer))

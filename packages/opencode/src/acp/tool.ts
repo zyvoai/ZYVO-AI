@@ -192,8 +192,11 @@ export function completedToolUpdate(input: {
   return {
     toolCallId: input.toolCallId,
     status: "completed",
-    ...(input.state.title ? { title: input.state.title } : {}),
+    kind: toToolKind(input.toolName),
+    title: toolTitle(input.toolName, input.state.input, input.state.title),
+    locations: toLocations(input.toolName, input.state.input, input.cwd),
     content: completedToolContent(input.toolName, input.state),
+    rawInput: rawInput(input.toolName, input.state.input, input.cwd),
     rawOutput: completedToolRawOutput(input.state),
   }
 }
@@ -263,7 +266,7 @@ export function shellOutputSnapshot(state: { readonly metadata?: unknown }) {
 // For shell tools, surface the actual command as the title so it stays visible
 // before output lands; non-shell tools keep their model-provided title.
 function toolTitle(toolName: string, input: ToolInput, fallback: string | undefined) {
-  if (isShell(toolName)) return shellCommand(input) ?? fallback ?? toolName
+  if (isShell(toolName)) return shellCommand(input) ?? stringValue(input.description) ?? fallback ?? toolName
   return fallback || toolName
 }
 

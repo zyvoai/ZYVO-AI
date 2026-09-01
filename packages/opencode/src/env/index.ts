@@ -16,7 +16,7 @@ export class Service extends Context.Service<Service, Interface>()("@opencode/En
 
 export const use = serviceUse(Service)
 
-const layer = Layer.effect(
+export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const state = yield* InstanceState.make<State>(Effect.fn("Env.state")(() => Effect.succeed({ ...process.env })))
@@ -36,6 +36,8 @@ const layer = Layer.effect(
   }),
 )
 
-export const node = LayerNode.make({ service: Service, layer: layer, deps: [] })
+export const defaultLayer = layer
+
+export const node = LayerNode.make(layer, [])
 
 export * as Env from "."

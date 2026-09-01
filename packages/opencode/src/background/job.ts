@@ -15,7 +15,7 @@ export {
 } from "@opencode-ai/core/background-job"
 
 /** Keeps the legacy service instance-scoped while sharing the core registry engine. */
-const layer = Layer.effect(
+export const layer = Layer.effect(
   CoreBackgroundJob.Service,
   Effect.gen(function* () {
     const state = yield* InstanceState.make(() => CoreBackgroundJob.make)
@@ -32,6 +32,8 @@ const layer = Layer.effect(
   }),
 )
 
-export const node = LayerNode.make({ service: CoreBackgroundJob.Service, layer, deps: [] })
+export const defaultLayer = layer
+
+export const node = LayerNode.make(layer, [])
 
 export * as BackgroundJob from "./job"

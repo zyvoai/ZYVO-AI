@@ -1,19 +1,19 @@
-import { Effect } from "effect"
-import { pathToFileURL } from "url"
-import { define } from "../internal"
 import { Npm } from "../../npm"
+import { Effect, Option } from "effect"
+import { pathToFileURL } from "url"
+import { PluginV2 } from "../../plugin"
 
-export const DynamicProviderPlugin = define({
-  id: "dynamic-provider",
-  effect: Effect.fn(function* (ctx) {
+export const DynamicProviderPlugin = PluginV2.define({
+  id: PluginV2.ID.make("dynamic-provider"),
+  effect: Effect.gen(function* () {
     const npm = yield* Npm.Service
-    yield* ctx.aisdk.sdk(
-      Effect.fn(function* (evt) {
+    return {
+      "aisdk.sdk": Effect.fn(function* (evt) {
         if (evt.sdk) return
 
         const installedPath = evt.package.startsWith("file://")
           ? evt.package
-          : (yield* npm.add(evt.package).pipe(Effect.orDie)).entrypoint
+          : Option.getOrUndefined((yield* npm.add(evt.package).pipe(Effect.orDie)).entrypoint)
         if (!installedPath) throw new Error(`Package ${evt.package} has no import entrypoint`)
 
         const mod = yield* Effect.promise(async () => {
@@ -26,6 +26,6 @@ export const DynamicProviderPlugin = define({
 
         evt.sdk = mod[match](evt.options)
       }),
-    )
+    }
   }),
 })

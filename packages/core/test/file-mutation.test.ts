@@ -2,8 +2,6 @@ import fs from "fs/promises"
 import path from "path"
 import { describe, expect } from "bun:test"
 import { Deferred, Effect, Fiber, Layer } from "effect"
-import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
-import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { FileMutation } from "@opencode-ai/core/file-mutation"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { Location } from "@opencode-ai/core/location"
@@ -13,17 +11,14 @@ import { location } from "./fixture/location"
 import { tmpdir } from "./fixture/tmpdir"
 import { it } from "./lib/effect"
 
-function provide(directory: string, filesystemLayer = LayerNode.compile(FSUtil.node)) {
+function provide(directory: string, filesystem = FSUtil.defaultLayer) {
   const activeLocation = Layer.succeed(
     Location.Service,
     Location.Service.of(location({ directory: AbsolutePath.make(directory) })),
   )
-  return Effect.provide(
-    AppNodeBuilder.build(LayerNode.group([LocationMutation.node, FileMutation.node]), [
-      [Location.node, activeLocation],
-      [FSUtil.node, filesystemLayer],
-    ]),
-  )
+  const resolution = LocationMutation.layer.pipe(Layer.provide(filesystem), Layer.provide(activeLocation))
+  const mutation = FileMutation.layer.pipe(Layer.provide(filesystem))
+  return Effect.provide(Layer.mergeAll(resolution, mutation))
 }
 
 function withTmp<A, E, R>(f: (directory: string) => Effect.Effect<A, E, R>) {
@@ -364,5 +359,5 @@ function instrumentWrites(run: <E>(write: Effect.Effect<void, E>, target: string
           run(filesystem.writeFileString(target, content, options), target),
       })
     }),
-  ).pipe(Layer.provide(LayerNode.compile(FSUtil.node)))
+  ).pipe(Layer.provide(FSUtil.defaultLayer))
 }

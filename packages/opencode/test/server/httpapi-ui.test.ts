@@ -1,8 +1,7 @@
 import { createHash } from "node:crypto"
 import { describe, expect } from "bun:test"
 import { Flag } from "@opencode-ai/core/flag/flag"
-import { ConfigProvider, Effect, Layer, Option } from "effect"
-import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
+import { ConfigProvider, Effect, Layer } from "effect"
 import {
   HttpClient,
   HttpClientRequest,
@@ -40,15 +39,7 @@ const testStateLayer = Layer.effectDiscard(
   }),
 )
 
-const fsUtilLayer = AppNodeBuilder.build(FSUtil.node)
-const it = testEffect(Layer.mergeAll(testStateLayer, fsUtilLayer, RuntimeFlags.layer()))
-
-function authConfigLayer(input?: { password?: string; username?: string }) {
-  return ServerAuth.Config.configLayer({
-    password: input?.password === undefined ? Option.none() : Option.some(input.password),
-    username: input?.username ?? "opencode",
-  })
-}
+const it = testEffect(Layer.mergeAll(testStateLayer, FSUtil.defaultLayer, RuntimeFlags.layer()))
 
 function restoreEnv(key: string, value: string | undefined) {
   if (value === undefined) {
@@ -103,12 +94,18 @@ function uiApp(input?: {
         )
       }),
     ).pipe(
-      Layer.provide(authorizationRouterMiddleware.layer.pipe(Layer.provide(authConfigLayer(input)))),
+      Layer.provide(authorizationRouterMiddleware.layer.pipe(Layer.provide(ServerAuth.Config.defaultLayer))),
       Layer.provide([
-        fsUtilLayer,
+        FSUtil.defaultLayer,
         input?.client ?? httpClient(new Response("ui")),
         RuntimeFlags.layer({ disableEmbeddedWebUi: input?.disableEmbeddedWebUi ?? false }),
         HttpServer.layerServices,
+        ConfigProvider.layer(
+          ConfigProvider.fromUnknown({
+            OPENCODE_SERVER_PASSWORD: input?.password,
+            OPENCODE_SERVER_USERNAME: input?.username,
+          }),
+        ),
       ]),
     ),
     { disableLogger: true },
@@ -144,7 +141,7 @@ function routeOrderingApp() {
       }),
     ).pipe(
       Layer.provide([
-        fsUtilLayer,
+        FSUtil.defaultLayer,
         RuntimeFlags.layer({ disableEmbeddedWebUi: true }),
         httpClient(new Response("ui"), (request) => {
           proxiedUrl = request.url
@@ -326,7 +323,7 @@ describe("HttpApi UI fallback", () => {
     }),
   )
 
-  it.live("allows embedded UI terminal wasm, blob attachments, and theme preload CSP", () =>
+  it.live("allows embedded UI terminal wasm and theme preload CSP", () =>
     Effect.gen(function* () {
       const script = 'document.documentElement.dataset.theme = "dark"'
 
@@ -351,8 +348,7 @@ describe("HttpApi UI fallback", () => {
       const csp = response.headers.get("content-security-policy") ?? ""
       expect(csp).toContain("script-src 'self' 'wasm-unsafe-eval'")
       expect(csp).toContain(`'sha256-${createHash("sha256").update(script).digest("base64")}'`)
-      expect(csp).toContain("img-src 'self' data: https: blob:")
-      expect(csp).toContain("connect-src * data: blob:")
+      expect(csp).toContain("connect-src * data:")
     }),
   )
 

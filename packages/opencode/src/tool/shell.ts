@@ -260,7 +260,11 @@ const parse = Effect.fn("ShellTool.parse")(function* (command: string, ps: boole
   return tree
 })
 
-const ask = Effect.fn("ShellTool.ask")(function* (ctx: Tool.Context, scan: Scan, input: { command: string }) {
+const ask = Effect.fn("ShellTool.ask")(function* (
+  ctx: Tool.Context,
+  scan: Scan,
+  input: { command: string; description: string },
+) {
   if (scan.dirs.size > 0) {
     const directories = Array.from(scan.dirs)
     const globs = directories.map((dir) => {
@@ -273,6 +277,7 @@ const ask = Effect.fn("ShellTool.ask")(function* (ctx: Tool.Context, scan: Scan,
       always: globs,
       metadata: {
         command: input.command,
+        description: input.description,
         directories,
         patterns: globs,
       },
@@ -286,6 +291,7 @@ const ask = Effect.fn("ShellTool.ask")(function* (ctx: Tool.Context, scan: Scan,
     always: Array.from(scan.always),
     metadata: {
       command: input.command,
+      description: input.description,
     },
   })
 })
@@ -432,6 +438,7 @@ export const ShellTool = Tool.define(
         cwd: string
         env: NodeJS.ProcessEnv
         timeout: number
+        description: string
       },
       ctx: Tool.Context,
     ) {
@@ -475,6 +482,7 @@ export const ShellTool = Tool.define(
       yield* ctx.metadata({
         metadata: {
           output: "",
+          description: input.description,
         },
       })
 
@@ -515,6 +523,7 @@ export const ShellTool = Tool.define(
                       ctx.metadata({
                         metadata: {
                           output: last,
+                          description: input.description,
                         },
                       }),
                     ),
@@ -525,6 +534,7 @@ export const ShellTool = Tool.define(
               return ctx.metadata({
                 metadata: {
                   output: last,
+                  description: input.description,
                 },
               })
             }),
@@ -583,10 +593,11 @@ export const ShellTool = Tool.define(
         output += "\n\n<shell_metadata>\n" + meta.join("\n") + "\n</shell_metadata>"
       }
       return {
-        title: input.command,
+        title: input.description,
         metadata: {
           output: last || preview(output),
           exit: code,
+          description: input.description,
           truncated: cut,
           ...(cut && file ? { outputPath: file } : {}),
         },
@@ -635,6 +646,7 @@ export const ShellTool = Tool.define(
                   cwd,
                   env: yield* shellEnv(ctx, cwd),
                   timeout,
+                  description: params.description,
                 },
                 ctx,
               )

@@ -3,7 +3,6 @@ import { LLMEvent, ToolFailure } from "@opencode-ai/llm"
 import { LLMClient, RequestExecutor, WebSocketExecutor, type LLMClientShape } from "@opencode-ai/llm/route"
 import { jsonSchema, tool, type ModelMessage, type Tool } from "ai"
 import { Effect, Fiber, Layer, Stream } from "effect"
-import { FetchHttpClient } from "effect/unstable/http"
 import { LLMNative } from "@/session/llm/native-request"
 import { LLMNativeRuntime } from "@/session/llm/native-runtime"
 import type { Provider } from "@/provider/provider"
@@ -74,11 +73,7 @@ const providerInfo: Provider.Info = {
 }
 
 const it = testEffect(
-  LLMClient.layer.pipe(
-    Layer.provide(
-      Layer.mergeAll(RequestExecutor.layer.pipe(Layer.provide(FetchHttpClient.layer)), WebSocketExecutor.layer),
-    ),
-  ),
+  LLMClient.layer.pipe(Layer.provide(Layer.mergeAll(RequestExecutor.defaultLayer, WebSocketExecutor.layer))),
 )
 
 function responsesStream(chunks: unknown[]) {
@@ -120,9 +115,10 @@ const storedSession = {
 const openAIResponses = {
   user: (text: string) => ({ role: "user", content: [{ type: "input_text", text }] }),
   assistant: (text: string) => ({ role: "assistant", content: [{ type: "output_text", text }] }),
-  openaiReasoning: (text: string, encryptedContent: string) => ({
+  openaiReasoning: (text: string, options: { readonly itemId: string; readonly encryptedContent: string }) => ({
     type: "reasoning",
-    encrypted_content: encryptedContent,
+    id: options.itemId,
+    encrypted_content: options.encryptedContent,
     summary: [{ type: "summary_text", text }],
   }),
 }
@@ -661,7 +657,10 @@ describe("session.llm-native.request", () => {
       expectedBody: {
         input: [
           openAIResponses.user("What changed?"),
-          openAIResponses.openaiReasoning("Checked the previous diff.", "encrypted-state"),
+          openAIResponses.openaiReasoning("Checked the previous diff.", {
+            itemId: "rs_1",
+            encryptedContent: "encrypted-state",
+          }),
           openAIResponses.assistant("The parser changed."),
           openAIResponses.user("Summarize it."),
         ],
@@ -684,7 +683,7 @@ describe("session.llm-native.request", () => {
       ],
       providerOptions: { openai: { store: false, include: ["reasoning.encrypted_content"] } },
       expectedBody: {
-        input: [{ type: "reasoning", summary: [], encrypted_content: "encrypted-state" }],
+        input: [{ type: "reasoning", id: "rs_1", summary: [], encrypted_content: "encrypted-state" }],
         include: ["reasoning.encrypted_content"],
         store: false,
       },

@@ -1,6 +1,5 @@
 import path from "path"
 import { NodeFileSystem } from "@effect/platform-node"
-import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { describe, expect, test } from "bun:test"
 import { Effect, FileSystem, Layer } from "effect"
@@ -99,7 +98,7 @@ function userMessage(
   }
 }
 
-const it = testEffect(Layer.mergeAll(LayerNode.compile(FSUtil.node), NodeFileSystem.layer))
+const it = testEffect(Layer.mergeAll(FSUtil.defaultLayer, NodeFileSystem.layer))
 
 function remap(root: string, file: string) {
   if (file === Global.Path.state) {
@@ -124,7 +123,7 @@ function remappedFs(root: string) {
         writeJson: (file, data, mode) => fs.writeJson(remap(root, file), data, mode),
       })
     }),
-  ).pipe(Layer.provide(LayerNode.compile(FSUtil.node)))
+  ).pipe(Layer.provide(FSUtil.defaultLayer))
 }
 
 describe("run variant shared", () => {

@@ -1,4 +1,10 @@
-import { QuestionV1 } from "@opencode-ai/schema/question-v1"
+import { Schema } from "effect"
 
-export const QuestionID = QuestionV1.ID
-export type QuestionID = typeof QuestionID.Type
+import { Identifier } from "@/id/id"
+import { Newtype } from "@opencode-ai/core/schema"
+
+export class QuestionID extends Newtype<QuestionID>()("QuestionID", Schema.String.check(Schema.isStartsWith("que"))) {
+  static ascending(id?: string): QuestionID {
+    return this.make(Identifier.ascending("question", id))
+  }
+}

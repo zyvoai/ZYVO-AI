@@ -39,7 +39,7 @@ export class Service extends Context.Service<Service, Interface>()("@opencode/Ac
 
 export const use = serviceUse(Service)
 
-const layer = Layer.effect(
+export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const { db } = yield* Database.Service
@@ -166,6 +166,8 @@ const layer = Layer.effect(
   }),
 )
 
-export const node = LayerNode.make({ service: Service, layer: layer, deps: [Database.node] })
+export const defaultLayer = layer.pipe(Layer.provide(Database.defaultLayer))
+
+export const node = LayerNode.make(layer, [Database.node])
 
 export * as AccountRepo from "./repo"

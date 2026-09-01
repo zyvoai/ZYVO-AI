@@ -12,12 +12,10 @@ export const id = ProviderID.make("github-copilot")
 export type ModelOptions = Omit<RouteDefaultsInput, "providerOptions"> &
   ProviderAuthOption<"optional"> & {
     readonly baseURL: string
-    readonly endpoint?: "chat" | "responses"
     readonly providerOptions?: OpenAIProviderOptionsInput
   }
 
-export const shouldUseResponsesApi = (modelID: string | ModelID, endpoint?: ModelOptions["endpoint"]) => {
-  if (endpoint) return endpoint === "responses"
+export const shouldUseResponsesApi = (modelID: string | ModelID) => {
   const model = String(modelID)
   const match = /^gpt-(\d+)/.exec(model)
   if (!match) return false
@@ -30,7 +28,7 @@ const chatRoute = OpenAIChat.route.with({ provider: id })
 const responsesRoute = OpenAIResponses.route.with({ provider: id })
 
 const defaults = (options: ModelOptions) => {
-  const { apiKey: _, auth: _auth, baseURL: _baseURL, endpoint: _endpoint, ...rest } = options
+  const { apiKey: _, auth: _auth, baseURL: _baseURL, ...rest } = options
   return rest
 }
 
@@ -55,8 +53,7 @@ export const configure = (options: ModelOptions) => {
     chatRoute.with(withOpenAIOptions(modelID, defaults(options))).model({ id: modelID })
   return {
     id,
-    model: (modelID: string | ModelID) =>
-      shouldUseResponsesApi(modelID, options.endpoint) ? responses(modelID) : chat(modelID),
+    model: (modelID: string | ModelID) => (shouldUseResponsesApi(modelID) ? responses(modelID) : chat(modelID)),
     responses,
     chat,
     configure,

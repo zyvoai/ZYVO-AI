@@ -1,5 +1,4 @@
 import { describe, expect } from "bun:test"
-import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { Effect, Layer } from "effect"
 import path from "path"
@@ -16,7 +15,7 @@ const testStateLayer = Layer.effectDiscard(
   ),
 )
 
-const it = testEffect(Layer.mergeAll(testStateLayer, LayerNode.compile(FSUtil.node), httpApiLayer))
+const it = testEffect(Layer.mergeAll(testStateLayer, FSUtil.defaultLayer, httpApiLayer))
 const projectOptions = { config: { formatter: false, lsp: false } }
 const providerID = "test-oauth-parity"
 const oauthURL = "https://example.com/oauth"

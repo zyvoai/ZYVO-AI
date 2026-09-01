@@ -1,15 +1,15 @@
 export * as ApplicationTools from "./application-tools"
 
 import { Context, Effect, Layer, Scope } from "effect"
+import { enableMapSet } from "immer"
 import { State } from "../state"
 import { Tool } from "./tool"
-import { makeGlobalNode } from "../effect/app-node"
 
 type Data = {
   readonly entries: Map<string, Entry>
 }
 
-type Draft = {
+type Editor = {
   readonly set: (name: string, entry: Entry) => void
 }
 
@@ -27,12 +27,14 @@ export interface Interface {
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/ApplicationTools") {}
 
-const layer = Layer.effect(
+enableMapSet()
+
+export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
-    const state = State.create<Data, Draft>({
+    const state = State.create<Data, Editor>({
       initial: () => ({ entries: new Map() }),
-      draft: (draft) => ({
+      editor: (draft) => ({
         set: (name, tool) => {
           draft.entries.set(name, tool)
         },
@@ -45,13 +47,12 @@ const layer = Layer.effect(
         if (entries.length === 0) return
         yield* Effect.forEach(entries, ([name]) => Tool.validateName(name), { discard: true })
         const registrations = entries.map(([name, tool]) => [name, { identity: {}, tool }] as const)
-        yield* state.transform((draft) => {
-          for (const [name, entry] of registrations) draft.set(name, entry)
+        const transform = yield* state.transform()
+        yield* transform((editor) => {
+          for (const [name, entry] of registrations) editor.set(name, entry)
         })
       }),
       entries: () => state.get().entries,
     })
   }),
 )
-
-export const node = makeGlobalNode({ service: Service, layer, deps: [] })

@@ -3,8 +3,6 @@ import path from "path"
 import { describe, expect } from "bun:test"
 import { Effect, Layer } from "effect"
 import { AgentV2 } from "@opencode-ai/core/agent"
-import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
-import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { AbsolutePath } from "@opencode-ai/core/schema"
 import { SkillV2 } from "@opencode-ai/core/skill"
@@ -24,7 +22,11 @@ const discovery = Layer.succeed(
   }),
 )
 const it = testEffect(
-  AppNodeBuilder.build(LayerNode.group([SkillV2.node, AgentV2.node]), [[SkillDiscovery.node, discovery]]),
+  SkillV2.layer.pipe(
+    Layer.provide(discovery),
+    Layer.provide(FSUtil.defaultLayer),
+    Layer.provideMerge(AgentV2.locationLayer),
+  ),
 )
 
 function write(directory: string, name: string, description: string) {
@@ -57,7 +59,8 @@ describe("SkillV2", () => {
           })
 
           const skill = yield* SkillV2.Service
-          yield* skill.transform((editor) => {
+          const register = yield* skill.transform()
+          yield* register((editor) => {
             editor.source({ type: "directory", path: AbsolutePath.make(first) })
             editor.source({ type: "directory", path: AbsolutePath.make(first) })
             editor.source({ type: "directory", path: AbsolutePath.make(second) })
@@ -72,7 +75,7 @@ describe("SkillV2", () => {
             { type: "directory", path: AbsolutePath.make(second) },
           ])
           expect(yield* skill.list()).toEqual([
-            SkillV2.Info.make({
+            new SkillV2.Info({
               name: "foo",
               slash: true,
               location: AbsolutePath.make(path.join(first, "foo.md")),
@@ -105,14 +108,15 @@ describe("SkillV2", () => {
           urls.set("https://example.test/skills/", [AbsolutePath.make(tmp.path)])
 
           const agents = yield* AgentV2.Service
-          yield* agents.transform((editor) =>
+          yield* agents.update((editor) =>
             editor.update(AgentV2.ID.make("reviewer"), (agent) => {
               agent.permissions.push({ action: "skill", resource: "deploy", effect: "deny" })
             }),
           )
 
           const skill = yield* SkillV2.Service
-          yield* skill.transform((editor) => editor.source({ type: "url", url: "https://example.test/skills/" }))
+          const register = yield* skill.transform()
+          yield* register((editor) => editor.source({ type: "url", url: "https://example.test/skills/" }))
 
           expect((yield* skill.list()).map((item) => item.name)).toEqual(["deploy"])
           expect((yield* skill.list()).map((item) => item.name)).toEqual(["deploy"])

@@ -1,4 +1,5 @@
-import { SessionID, MessageID } from "./schema"
+import { EventV2 } from "@opencode-ai/core/event"
+import { SessionID, MessageID, PartID } from "./schema"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import {
@@ -11,15 +12,16 @@ import {
   Info,
   OutputLengthError,
   Part,
+  StructuredOutputError,
   SubtaskPart,
   User,
   WithParts,
+  type ToolPart,
 } from "@opencode-ai/core/v1/session"
 
 import { NamedError } from "@opencode-ai/core/util/error"
 import { APICallError, convertToModelMessages, LoadAPIKeyError, type ModelMessage, type UIMessage } from "ai"
 import { Database } from "@opencode-ai/core/database/database"
-import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { NotFoundError } from "@/storage/storage"
 import { and } from "drizzle-orm"
 import { desc } from "drizzle-orm"
@@ -56,7 +58,16 @@ export const Event = {
   Updated: SessionV1.Event.MessageUpdated,
   Removed: SessionV1.Event.MessageRemoved,
   PartUpdated: SessionV1.Event.PartUpdated,
-  PartDelta: SessionV1.Event.PartDelta,
+  PartDelta: EventV2.define({
+    type: "message.part.delta",
+    schema: {
+      sessionID: SessionID,
+      messageID: MessageID,
+      partID: PartID,
+      field: Schema.String,
+      delta: Schema.String,
+    },
+  }),
   PartRemoved: SessionV1.Event.PartRemoved,
 }
 
@@ -577,30 +588,27 @@ export const filterCompactedEffect = Effect.fnUntraced(function* (sessionID: Ses
 
 // filterCompacted reorders messages for model consumption
 // ([compaction-user, summary, ...retained tail..., continue-user]), so array
-// position is not chronological. IDs are only a deterministic tie-breaker
-// because imported messages do not necessarily have monotonic IDs.
+// position is not chronological. Derive each binding by max id (MessageID
+// is monotonic via MessageID.ascending) so a pre-compaction overflowing tail
+// assistant doesn't get mistaken for the most recent turn. tasks are
+// compaction/subtask parts attached to user messages newer than the latest
+// finished assistant — i.e. unprocessed work.
 export function latest(msgs: WithParts[]) {
   let user: User | undefined
   let assistant: Assistant | undefined
   let finished: Assistant | undefined
   for (const msg of msgs) {
     const info = msg.info
-    if (info.role === "user" && isAfter(info, user)) user = info
-    if (info.role === "assistant" && isAfter(info, assistant)) assistant = info
-    if (info.role === "assistant" && info.finish && isAfter(info, finished)) finished = info
+    if (info.role === "user" && (!user || info.id > user.id)) user = info
+    if (info.role === "assistant" && (!assistant || info.id > assistant.id)) assistant = info
+    if (info.role === "assistant" && info.finish && (!finished || info.id > finished.id)) finished = info
   }
   const tasks = msgs.flatMap((m) =>
-    finished && !isAfter(m.info, finished)
+    finished && m.info.id <= finished.id
       ? []
       : m.parts.filter((p): p is CompactionPart | SubtaskPart => p.type === "compaction" || p.type === "subtask"),
   )
   return { user, assistant, finished, tasks }
-}
-
-function isAfter(info: Info, other?: Info) {
-  if (!other) return true
-  if (info.time.created !== other.time.created) return info.time.created > other.time.created
-  return info.id > other.id
 }
 
 export function fromError(
@@ -734,4 +742,3 @@ export function fromError(
 }
 
 export * as MessageV2 from "./message-v2"
-export const node = LayerNode.group([Database.node])

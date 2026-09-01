@@ -18,11 +18,11 @@ export type Info = {
 }
 
 export class Config extends Context.Service<Config, Info>()("@opencode/ServerAuthConfig") {
-  static configLayer(input: Info) {
+  static layer(input: Info) {
     return Layer.succeed(this, this.of(input))
   }
 
-  static get layer() {
+  static get defaultLayer() {
     return Layer.effect(
       this,
       Effect.gen(function* () {

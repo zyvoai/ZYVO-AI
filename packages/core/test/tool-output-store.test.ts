@@ -1,8 +1,6 @@
 import { describe, expect } from "bun:test"
 import path from "path"
 import { Cause, Effect, Exit, Fiber, Layer, Option } from "effect"
-import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
-import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { Global } from "@opencode-ai/core/global"
 import { Config } from "@opencode-ai/core/config"
@@ -30,14 +28,14 @@ const withStore = <A, E, R>(
             }),
           )
         : Layer.empty
-
-      const store = AppNodeBuilder.build(LayerNode.group([ToolOutputStore.node, FSUtil.node]), [
-        [Global.node, global],
-        [Config.node, configured],
-      ])
+      const store = ToolOutputStore.layer.pipe(
+        Layer.provide(FSUtil.defaultLayer),
+        Layer.provide(global),
+        Layer.provide(configured),
+      )
       return Effect.gen(function* () {
         return yield* body({ root: tmp.path, store: yield* ToolOutputStore.Service, fs: yield* FSUtil.Service })
-      }).pipe(Effect.provide(store))
+      }).pipe(Effect.provide(Layer.mergeAll(store, FSUtil.defaultLayer)))
     },
     (tmp) => Effect.promise(() => tmp[Symbol.asyncDispose]()),
   )
@@ -187,11 +185,11 @@ describe("ToolOutputStore", () => {
             writeFileString: () => Effect.never,
           })
         }),
-      ).pipe(Layer.provide(LayerNode.compile(FSUtil.node)))
-      const store = AppNodeBuilder.build(ToolOutputStore.nodeWithoutConfig, [
-        [Global.node, Global.layerWith({ data: root.path })],
-        [FSUtil.node, blockedFilesystem],
-      ])
+      ).pipe(Layer.provide(FSUtil.defaultLayer))
+      const store = ToolOutputStore.layer.pipe(
+        Layer.provide(blockedFilesystem),
+        Layer.provide(Global.layerWith({ data: root.path })),
+      )
       const exit = yield* Effect.gen(function* () {
         const service = yield* ToolOutputStore.Service
         const fiber = yield* service

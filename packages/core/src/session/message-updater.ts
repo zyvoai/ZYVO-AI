@@ -102,7 +102,7 @@ export function update(adapter: Adapter, event: SessionEvent.Event) {
     yield* SessionEvent.All.match(event, {
       "session.next.agent.switched": (event) => {
         return adapter.appendMessage(
-          SessionMessage.AgentSwitched.make({
+          new SessionMessage.AgentSwitched({
             id: event.data.messageID,
             type: "agent-switched",
             metadata: event.metadata,
@@ -113,7 +113,7 @@ export function update(adapter: Adapter, event: SessionEvent.Event) {
       },
       "session.next.model.switched": (event) => {
         return adapter.appendMessage(
-          SessionMessage.ModelSwitched.make({
+          new SessionMessage.ModelSwitched({
             id: event.data.messageID,
             type: "model-switched",
             metadata: event.metadata,
@@ -125,7 +125,7 @@ export function update(adapter: Adapter, event: SessionEvent.Event) {
       "session.next.moved": () => Effect.void,
       "session.next.prompted": (event) => {
         return adapter.appendMessage(
-          SessionMessage.User.make({
+          new SessionMessage.User({
             id: event.data.messageID,
             type: "user",
             metadata: event.metadata,
@@ -137,9 +137,11 @@ export function update(adapter: Adapter, event: SessionEvent.Event) {
         )
       },
       "session.next.prompt.admitted": () => Effect.void,
+      "session.next.prompt.promoted": () => Effect.void,
+      "session.next.interrupt.requested": () => Effect.void,
       "session.next.context.updated": (event) =>
         adapter.appendMessage(
-          SessionMessage.System.make({
+          new SessionMessage.System({
             id: event.data.messageID,
             type: "system",
             text: event.data.text,
@@ -148,7 +150,7 @@ export function update(adapter: Adapter, event: SessionEvent.Event) {
         ),
       "session.next.synthetic": (event) => {
         return adapter.appendMessage(
-          SessionMessage.Synthetic.make({
+          new SessionMessage.Synthetic({
             sessionID: event.data.sessionID,
             text: event.data.text,
             id: event.data.messageID,
@@ -159,7 +161,7 @@ export function update(adapter: Adapter, event: SessionEvent.Event) {
       },
       "session.next.shell.started": (event) => {
         return adapter.appendMessage(
-          SessionMessage.Shell.make({
+          new SessionMessage.Shell({
             id: event.data.messageID,
             type: "shell",
             metadata: event.metadata,
@@ -194,7 +196,7 @@ export function update(adapter: Adapter, event: SessionEvent.Event) {
             )
           }
           yield* adapter.appendMessage(
-            SessionMessage.Assistant.make({
+            new SessionMessage.Assistant({
               id: event.data.assistantMessageID,
               type: "assistant",
               agent: event.data.agent,
@@ -212,12 +214,7 @@ export function update(adapter: Adapter, event: SessionEvent.Event) {
           draft.finish = event.data.finish
           draft.cost = event.data.cost
           draft.tokens = event.data.tokens
-          if (event.data.snapshot || event.data.files)
-            draft.snapshot = {
-              ...draft.snapshot,
-              end: event.data.snapshot,
-              files: event.data.files ? Array.from(event.data.files) : undefined,
-            }
+          if (event.data.snapshot) draft.snapshot = { ...draft.snapshot, end: event.data.snapshot }
         })
       },
       "session.next.step.failed": (event) => {
@@ -230,7 +227,7 @@ export function update(adapter: Adapter, event: SessionEvent.Event) {
       "session.next.text.started": (event) => {
         return updateOwnedAssistant(event.data.assistantMessageID, (draft) => {
           draft.content.push(
-            castDraft(SessionMessage.AssistantText.make({ type: "text", id: event.data.textID, text: "" })),
+            castDraft(new SessionMessage.AssistantText({ type: "text", id: event.data.textID, text: "" })),
           )
         })
       },
@@ -250,12 +247,12 @@ export function update(adapter: Adapter, event: SessionEvent.Event) {
         return updateOwnedAssistant(event.data.assistantMessageID, (draft) => {
           draft.content.push(
             castDraft(
-              SessionMessage.AssistantTool.make({
+              new SessionMessage.AssistantTool({
                 type: "tool",
                 id: event.data.callID,
                 name: event.data.name,
                 time: { created: event.data.timestamp },
-                state: SessionMessage.ToolStatePending.make({ status: "pending", input: "" }),
+                state: new SessionMessage.ToolStatePending({ status: "pending", input: "" }),
               }),
             ),
           )
@@ -275,7 +272,7 @@ export function update(adapter: Adapter, event: SessionEvent.Event) {
             match.provider = event.data.provider
             match.time.ran = event.data.timestamp
             match.state = castDraft(
-              SessionMessage.ToolStateRunning.make({
+              new SessionMessage.ToolStateRunning({
                 status: "running",
                 input: event.data.input,
                 structured: {},
@@ -305,7 +302,7 @@ export function update(adapter: Adapter, event: SessionEvent.Event) {
             }
             match.time.completed = event.data.timestamp
             match.state = castDraft(
-              SessionMessage.ToolStateCompleted.make({
+              new SessionMessage.ToolStateCompleted({
                 status: "completed",
                 input: match.state.input,
                 structured: event.data.structured,
@@ -328,7 +325,7 @@ export function update(adapter: Adapter, event: SessionEvent.Event) {
             }
             match.time.completed = event.data.timestamp
             match.state = castDraft(
-              SessionMessage.ToolStateError.make({
+              new SessionMessage.ToolStateError({
                 status: "error",
                 error: event.data.error,
                 input: typeof match.state.input === "string" ? {} : match.state.input,
@@ -344,12 +341,11 @@ export function update(adapter: Adapter, event: SessionEvent.Event) {
         return updateOwnedAssistant(event.data.assistantMessageID, (draft) => {
           draft.content.push(
             castDraft(
-              SessionMessage.AssistantReasoning.make({
+              new SessionMessage.AssistantReasoning({
                 type: "reasoning",
                 id: event.data.reasoningID,
                 text: "",
                 providerMetadata: event.data.providerMetadata,
-                time: { created: event.data.timestamp },
               }),
             ),
           )
@@ -366,7 +362,6 @@ export function update(adapter: Adapter, event: SessionEvent.Event) {
           const match = latestReasoning(draft, event.data.reasoningID)
           if (match) {
             match.text = event.data.text
-            match.time = { created: match.time?.created ?? event.data.timestamp, completed: event.data.timestamp }
             if (event.data.providerMetadata !== undefined) match.providerMetadata = event.data.providerMetadata
           }
         })
@@ -376,7 +371,7 @@ export function update(adapter: Adapter, event: SessionEvent.Event) {
       "session.next.compaction.delta": () => Effect.void,
       "session.next.compaction.ended": (event) => {
         return adapter.appendMessage(
-          SessionMessage.Compaction.make({
+          new SessionMessage.Compaction({
             id: event.data.messageID,
             type: "compaction",
             metadata: event.metadata,
@@ -387,9 +382,6 @@ export function update(adapter: Adapter, event: SessionEvent.Event) {
           }),
         )
       },
-      "session.next.revert.staged": () => Effect.void,
-      "session.next.revert.cleared": () => Effect.void,
-      "session.next.revert.committed": () => Effect.void,
     })
   })
 }

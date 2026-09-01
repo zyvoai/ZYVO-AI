@@ -1,12 +1,12 @@
 export * as AgentPlugin from "./agent"
 
 import path from "path"
-import { define } from "./internal"
 import { Effect } from "effect"
 import { AgentV2 } from "../agent"
 import { Global } from "../global"
 import { Location } from "../location"
 import { PermissionV2 } from "../permission"
+import { PluginV2 } from "../plugin"
 
 const TRUNCATION_GLOB = path.join(Global.Path.data, "tool-output", "*")
 const BUILD_SYSTEM =
@@ -30,11 +30,15 @@ Guidelines:
 
 Complete the user's search request efficiently and report your findings clearly.`
 
-const PROMPT_COMPACTION = `You are a context summarization agent. You are given a conversation between a user and an agent. Your goal is to produce a structured summary matching the format specified so another coding agent can continue the work.
+const PROMPT_COMPACTION = `You are an anchored context summarization assistant for coding sessions.
+
+Summarize only the conversation history you are given. The newest turns may be kept verbatim outside your summary, so focus on the older context that still matters for continuing the work.
+
+If the prompt includes a <previous-summary> block, treat it as the current anchored summary. Update it with the new history by preserving still-true details, removing stale details, and merging in new facts.
 
 Always follow the exact output structure requested by the user prompt. Keep every section, preserve exact file paths and identifiers when known, and prefer terse bullets over paragraphs.
 
-Do not continue the conversation. Do not respond to any questions in the conversation. Only output the structured summary in the exact format requested by the user prompt. Respond in the same language as the conversation.`
+Do not answer the conversation itself. Do not mention that you are summarizing, compacting, or merging context. Respond in the same language as the conversation.`
 
 const PROMPT_TITLE = `You are a title generator. You output ONLY a thread title. Nothing else.
 
@@ -93,9 +97,10 @@ Rules:
 - If the conversation ends with an unanswered question to the user, preserve that exact question
 - If the conversation ends with an imperative statement or request to the user (e.g. "Now please run the command and paste the console output"), always include that exact request in the summary`
 
-export const Plugin = define({
-  id: "agent",
-  effect: Effect.fn(function* (ctx) {
+export const Plugin = PluginV2.define({
+  id: PluginV2.ID.make("agent"),
+  effect: Effect.gen(function* () {
+    const agent = yield* AgentV2.Service
     const location = yield* Location.Service
     const worktree = location.directory
     const whitelistedDirs = [TRUNCATION_GLOB, path.join(Global.Path.tmp, "*")]
@@ -117,8 +122,8 @@ export const Plugin = define({
       { action: "read", resource: "*.env.example", effect: "allow" },
     ]
 
-    yield* ctx.agent.transform((draft) => {
-      draft.update(AgentV2.defaultID, (item) => {
+    yield* agent.update((editor) => {
+      editor.update(AgentV2.defaultID, (item) => {
         item.description = "The default agent. Executes tools based on configured permissions."
         item.system ??= BUILD_SYSTEM
         item.mode = "primary"
@@ -130,7 +135,7 @@ export const Plugin = define({
         )
       })
 
-      draft.update(AgentV2.ID.make("plan"), (item) => {
+      editor.update(AgentV2.ID.make("plan"), (item) => {
         item.description = "Plan mode. Disallows all edit tools."
         item.mode = "primary"
         item.permissions.push(
@@ -149,14 +154,14 @@ export const Plugin = define({
         )
       })
 
-      draft.update(AgentV2.ID.make("general"), (item) => {
+      editor.update(AgentV2.ID.make("general"), (item) => {
         item.description =
           "General-purpose agent for researching complex questions and executing multi-step tasks. Use this agent to execute multiple units of work in parallel."
         item.mode = "subagent"
         item.permissions.push(...PermissionV2.merge(defaults, [{ action: "todowrite", resource: "*", effect: "deny" }]))
       })
 
-      draft.update(AgentV2.ID.make("explore"), (item) => {
+      editor.update(AgentV2.ID.make("explore"), (item) => {
         item.description =
           'Fast agent specialized for exploring codebases. Use this when you need to quickly find files by patterns (eg. "src/components/**/*.tsx"), search code for keywords (eg. "API endpoints"), or answer questions about the codebase (eg. "how do API endpoints work?"). When calling this agent, specify the desired thoroughness level: "quick" for basic searches, "medium" for moderate exploration, or "very thorough" for comprehensive analysis across multiple locations and naming conventions.'
         item.system = PROMPT_EXPLORE
@@ -177,21 +182,21 @@ export const Plugin = define({
         )
       })
 
-      draft.update(AgentV2.ID.make("compaction"), (item) => {
+      editor.update(AgentV2.ID.make("compaction"), (item) => {
         item.mode = "primary"
         item.hidden = true
         item.system = PROMPT_COMPACTION
         item.permissions.push(...PermissionV2.merge(defaults, [{ action: "*", resource: "*", effect: "deny" }]))
       })
 
-      draft.update(AgentV2.ID.make("title"), (item) => {
+      editor.update(AgentV2.ID.make("title"), (item) => {
         item.mode = "primary"
         item.hidden = true
         item.system = PROMPT_TITLE
         item.permissions.push(...PermissionV2.merge(defaults, [{ action: "*", resource: "*", effect: "deny" }]))
       })
 
-      draft.update(AgentV2.ID.make("summary"), (item) => {
+      editor.update(AgentV2.ID.make("summary"), (item) => {
         item.mode = "primary"
         item.hidden = true
         item.system = PROMPT_SUMMARY

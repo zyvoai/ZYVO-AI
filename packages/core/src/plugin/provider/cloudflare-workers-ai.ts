@@ -1,16 +1,16 @@
 import os from "os"
 import { InstallationVersion } from "../../installation/version"
 import { Effect } from "effect"
-import { define } from "../internal"
+import { PluginV2 } from "../../plugin"
 import { ProviderV2 } from "../../provider"
 
 const providerID = ProviderV2.ID.make("cloudflare-workers-ai")
 
-export const CloudflareWorkersAIPlugin = define({
-  id: "cloudflare-workers-ai",
-  effect: Effect.fn(function* (ctx) {
-    yield* ctx.catalog.transform(
-      Effect.fn(function* (evt) {
+export const CloudflareWorkersAIPlugin = PluginV2.define({
+  id: PluginV2.ID.make("cloudflare-workers-ai"),
+  effect: Effect.gen(function* () {
+    return {
+      "catalog.transform": Effect.fn(function* (evt) {
         const item = evt.provider.get(providerID)
         if (!item) return
         evt.provider.update(item.provider.id, (provider) => {
@@ -20,9 +20,7 @@ export const CloudflareWorkersAIPlugin = define({
           if (accountId) provider.api.url = workersEndpoint(accountId)
         })
       }),
-    )
-    yield* ctx.aisdk.sdk(
-      Effect.fn(function* (evt) {
+      "aisdk.sdk": Effect.fn(function* (evt) {
         if (evt.model.providerID !== providerID) return
         if (evt.package !== "@ai-sdk/openai-compatible") return
 
@@ -36,13 +34,11 @@ export const CloudflareWorkersAIPlugin = define({
           }) as any,
         )
       }),
-    )
-    yield* ctx.aisdk.language(
-      Effect.fn(function* (evt) {
+      "aisdk.language": Effect.fn(function* (evt) {
         if (evt.model.providerID !== providerID) return
         evt.language = evt.sdk.languageModel(evt.model.api.id)
       }),
-    )
+    }
   }),
 })
 

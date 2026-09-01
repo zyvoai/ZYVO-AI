@@ -589,38 +589,6 @@ test("coalesces same-line tool progress into one snapshot", async () => {
   }
 })
 
-test("omits the current directory from bash titles", async () => {
-  const out = await setup()
-
-  try {
-    await out.scrollback.append(
-      toolCommit({
-        tool: "bash",
-        phase: "start",
-        toolState: "running",
-        state: {
-          status: "running",
-          input: {
-            command: "pwd",
-            workdir: process.cwd(),
-          },
-          time: { start: 1 },
-        },
-      }),
-    )
-
-    const commits = claim(out.renderer)
-    try {
-      expect(render(commits)).toContain("$ pwd")
-      expect(render(commits)).not.toContain("Running in .")
-    } finally {
-      destroy(commits)
-    }
-  } finally {
-    out.scrollback.destroy()
-  }
-})
-
 test("renders completed bash output with one blank line after the command and before the next group", async () => {
   const out = await setup()
 
@@ -647,6 +615,7 @@ test("renders completed bash output with one blank line after the command and be
           input: {
             command: "git status",
             workdir: "/tmp/demo",
+            description: "Show git status",
           },
           time: { start: 1 },
         },
@@ -664,6 +633,7 @@ test("renders completed bash output with one blank line after the command and be
           input: {
             command: "git status",
             workdir: "/tmp/demo",
+            description: "Show git status",
           },
           time: { start: 1, end: 2 },
         },
@@ -675,7 +645,6 @@ test("renders completed bash output with one blank line after the command and be
     take()
 
     const output = lines.join("\n")
-    expect(output).toContain("# Running in /tmp/demo\n$ git status")
     expect(output).toContain("$ git status\n\nOn branch demo")
     expect(output).toContain("nothing to commit, working tree clean\n\noc-run-dev ahead 1")
     expect(output).not.toContain("nothing to commit, working tree clean\n\n\noc-run-dev ahead 1")
@@ -708,6 +677,7 @@ test("inserts a spacer before the next tool after completed multiline bash outpu
           input: {
             command: "pwd; ls -la",
             workdir: "/tmp/demo",
+            description: "Lists current directory files",
           },
           time: { start: 1 },
         },
@@ -725,6 +695,7 @@ test("inserts a spacer before the next tool after completed multiline bash outpu
           input: {
             command: "pwd; ls -la",
             workdir: "/tmp/demo",
+            description: "Lists current directory files",
           },
           output: ["/tmp/demo", "pwd; ls -la", "/tmp/demo", "total 4", "", ""].join("\n"),
           title: "pwd; ls -la",
@@ -784,6 +755,7 @@ test("does not double-space before completed bash output when inline tool header
           input: {
             command: "ls",
             workdir: "src/cli/cmd/run",
+            description: "Lists files in run directory",
           },
           time: { start: 1 },
         },
@@ -833,6 +805,7 @@ test("does not double-space before completed bash output when inline tool header
           input: {
             command: "ls",
             workdir: "src/cli/cmd/run",
+            description: "Lists files in run directory",
           },
           output: ["src/cli/cmd/run", "ls", "demo.ts", "entry.body.ts", "", ""].join("\n"),
           title: "ls",

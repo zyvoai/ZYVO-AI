@@ -1,6 +1,5 @@
 export * as LocationMutation from "./location-mutation"
 
-import { makeLocationNode } from "./effect/app-node"
 import path from "path"
 import { Context, Effect, Layer, Schema } from "effect"
 import { FSUtil } from "./fs-util"
@@ -76,7 +75,7 @@ interface ResolvedPath {
 
 const slash = (value: string) => value.replaceAll("\\", "/")
 
-const layer = Layer.effect(
+export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const fs = yield* FSUtil.Service
@@ -154,9 +153,3 @@ const layer = Layer.effect(
 )
 
 export const locationLayer = layer
-
-export const node = makeLocationNode({
-  service: Service,
-  layer: layer.pipe(Layer.orDie),
-  deps: [FSUtil.node, Location.node],
-})

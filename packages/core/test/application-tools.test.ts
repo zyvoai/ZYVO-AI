@@ -1,8 +1,7 @@
 import { describe, expect } from "bun:test"
-import { Tool } from "@opencode-ai/core/tool/tool"
+import { Tool } from "@opencode-ai/core/public"
 import { ApplicationTools } from "@opencode-ai/core/tool/application-tools"
-import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
-import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+import { PermissionV2 } from "@opencode-ai/core/permission"
 import { SessionV2 } from "@opencode-ai/core/session"
 import { SessionMessage } from "@opencode-ai/core/session/message"
 import { AgentV2 } from "@opencode-ai/core/agent"
@@ -10,14 +9,19 @@ import { ToolRegistry } from "@opencode-ai/core/tool/registry"
 import { executeTool, settleTool, toolDefinitions } from "./lib/tool"
 import { ToolOutputStore } from "@opencode-ai/core/tool-output-store"
 import { Tools } from "@opencode-ai/core/tool/tools"
-import { Deferred, Effect, Exit, Fiber, Schema, Scope } from "effect"
+import { Deferred, Effect, Exit, Fiber, Layer, Schema, Scope } from "effect"
 import { testEffect } from "./lib/effect"
 
-const it = testEffect(
-  AppNodeBuilder.build(LayerNode.group([ApplicationTools.node, ToolRegistry.node, ToolRegistry.toolsNode]), [
-    [ToolOutputStore.node, ToolOutputStore.nodeWithoutConfig],
-  ]),
+const permission = Layer.mock(PermissionV2.Service, {
+  assert: () => Effect.void,
+})
+const applications = ApplicationTools.layer
+const registry = ToolRegistry.layer.pipe(
+  Layer.provide(permission),
+  Layer.provide(applications),
+  Layer.provide(ToolOutputStore.defaultLayer),
 )
+const it = testEffect(Layer.mergeAll(applications, registry))
 
 const sessionID = SessionV2.ID.make("ses_application_tool")
 const agent = AgentV2.ID.make("build")

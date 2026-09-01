@@ -14,7 +14,7 @@ export interface Interface {
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/SessionShare") {}
 
-const layer = Layer.effect(
+export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const cfg = yield* Config.Service
@@ -49,10 +49,13 @@ const layer = Layer.effect(
   }),
 )
 
-export const node = LayerNode.make({
-  service: Service,
-  layer: layer,
-  deps: [Config.node, Session.node, ShareNext.node, RuntimeFlags.node],
-})
+export const defaultLayer = layer.pipe(
+  Layer.provide(ShareNext.defaultLayer),
+  Layer.provide(Session.defaultLayer),
+  Layer.provide(Config.defaultLayer),
+  Layer.provide(RuntimeFlags.defaultLayer),
+)
+
+export const node = LayerNode.make(layer, [Config.node, Session.node, ShareNext.node, RuntimeFlags.node])
 
 export * as SessionShare from "./session"

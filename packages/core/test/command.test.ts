@@ -1,18 +1,18 @@
 import { describe, expect } from "bun:test"
 import { Effect } from "effect"
 import { CommandV2 } from "@opencode-ai/core/command"
-import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { testEffect } from "./lib/effect"
 
-const it = testEffect(AppNodeBuilder.build(CommandV2.node))
+const it = testEffect(CommandV2.locationLayer)
 
 describe("CommandV2", () => {
   it.effect("applies command transforms and preserves later overrides", () =>
     Effect.gen(function* () {
       const command = yield* CommandV2.Service
-      yield* command.transform((editor) => {
+      const transform = yield* command.transform()
+      yield* transform((editor) => {
         editor.update("review", (command) => {
           command.template = "First"
           command.description = "Review code"
@@ -28,7 +28,7 @@ describe("CommandV2", () => {
       })
 
       expect(yield* command.get("review")).toEqual(
-        CommandV2.Info.make({
+        new CommandV2.Info({
           name: "review",
           template: "Second",
           description: "Review code",
@@ -40,7 +40,7 @@ describe("CommandV2", () => {
         }),
       )
       expect(yield* command.list()).toEqual([
-        CommandV2.Info.make({
+        new CommandV2.Info({
           name: "review",
           template: "Second",
           description: "Review code",

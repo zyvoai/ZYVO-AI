@@ -1,6 +1,7 @@
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { EventV2Bridge } from "@/event-v2-bridge"
+import { EventV2 } from "@opencode-ai/core/event"
 import * as LSPClient from "./client"
 import path from "path"
 import { pathToFileURL, fileURLToPath } from "url"
@@ -13,9 +14,10 @@ import { InstanceState } from "@/effect/instance-state"
 import { containsPath } from "@/project/instance-context"
 import { NonNegativeInt } from "@opencode-ai/core/schema"
 import { RuntimeFlags } from "@/effect/runtime-flags"
-import { LspEvent } from "@opencode-ai/schema/lsp-event"
 
-export const Event = LspEvent
+export const Event = {
+  Updated: EventV2.define({ type: "lsp.updated", schema: {} }),
+}
 
 const Position = Schema.Struct({
   line: NonNegativeInt,
@@ -135,7 +137,7 @@ export interface Interface {
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/LSP") {}
 
-const layer = Layer.effect(
+export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const config = yield* Config.Service
@@ -496,12 +498,14 @@ const layer = Layer.effect(
   }),
 )
 
+export const defaultLayer = layer.pipe(
+  Layer.provide(Config.defaultLayer),
+  Layer.provide(RuntimeFlags.defaultLayer),
+  Layer.provide(EventV2Bridge.defaultLayer),
+)
+
 export * as Diagnostic from "./diagnostic"
 
-export const node = LayerNode.make({
-  service: Service,
-  layer: layer,
-  deps: [Config.node, RuntimeFlags.node, FSUtil.node, EventV2Bridge.node],
-})
+export const node = LayerNode.make(layer, [Config.node, RuntimeFlags.node, FSUtil.node, EventV2Bridge.node])
 
 export * as LSP from "./lsp"

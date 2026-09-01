@@ -2,60 +2,74 @@ export * as Credential from "./credential"
 
 import { asc, eq } from "drizzle-orm"
 import { Context, Effect, Layer, Schema } from "effect"
-import { Credential } from "@opencode-ai/schema/credential"
-import { Integration } from "@opencode-ai/schema/integration"
 import { Database } from "./database/database"
-import { makeGlobalNode } from "./effect/app-node"
+import { IntegrationSchema } from "./integration/schema"
+import { NonNegativeInt, withStatics } from "./schema"
+import { Identifier } from "./util/identifier"
 import { CredentialTable } from "./credential/sql"
 
-export const ID = Credential.ID
-export type ID = Credential.ID
+export const ID = Schema.String.pipe(
+  Schema.brand("Credential.ID"),
+  withStatics((schema) => ({ create: () => schema.make("cred_" + Identifier.ascending()) })),
+)
+export type ID = typeof ID.Type
 
-export const OAuth = Credential.OAuth
-export type OAuth = Credential.OAuth
+export class OAuth extends Schema.Class<OAuth>("Credential.OAuth")({
+  type: Schema.Literal("oauth"),
+  methodID: IntegrationSchema.MethodID,
+  refresh: Schema.String,
+  access: Schema.String,
+  expires: NonNegativeInt,
+  metadata: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+}) {}
 
-export const Key = Credential.Key
-export type Key = Credential.Key
+export class Key extends Schema.Class<Key>("Credential.Key")({
+  type: Schema.Literal("key"),
+  key: Schema.String,
+  metadata: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+}) {}
 
-export const Value = Credential.Value
-export type Value = Credential.Value
+export const Info = Schema.Union([OAuth, Key])
+  .pipe(Schema.toTaggedUnion("type"))
+  .annotate({ identifier: "Credential.Info" })
+export type Info = Schema.Schema.Type<typeof Info>
 
-export class Info extends Schema.Class<Info>("Credential.Info")({
+export class Stored extends Schema.Class<Stored>("Credential.Stored")({
   id: ID,
-  integrationID: Integration.ID,
+  integrationID: IntegrationSchema.ID,
   label: Schema.String,
-  value: Value,
+  value: Info,
 }) {}
 
 export interface Interface {
   /** Returns every stored credential. */
-  readonly all: () => Effect.Effect<Info[]>
+  readonly all: () => Effect.Effect<Stored[]>
   /** Returns stored credentials belonging to one integration. */
-  readonly list: (integrationID: Integration.ID) => Effect.Effect<Info[]>
+  readonly list: (integrationID: IntegrationSchema.ID) => Effect.Effect<Stored[]>
   /** Returns one stored credential by ID. */
-  readonly get: (id: ID) => Effect.Effect<Info | undefined>
+  readonly get: (id: ID) => Effect.Effect<Stored | undefined>
   /** Replaces any credential for an integration and returns the new record. */
   readonly create: (input: {
-    readonly integrationID: Integration.ID
-    readonly value: Value
+    readonly integrationID: IntegrationSchema.ID
+    readonly value: Info
     readonly label?: string
-  }) => Effect.Effect<Info>
+  }) => Effect.Effect<Stored>
   /** Updates the label or secret value of a stored credential. */
-  readonly update: (id: ID, updates: Partial<Pick<Info, "label" | "value">>) => Effect.Effect<void>
+  readonly update: (id: ID, updates: Partial<Pick<Stored, "label" | "value">>) => Effect.Effect<void>
   /** Removes a stored credential. */
   readonly remove: (id: ID) => Effect.Effect<void>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/v2/Credential") {}
 
-const layer = Layer.effect(
+export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const { db } = yield* Database.Service
-    const decode = Schema.decodeUnknownSync(Value)
+    const decode = Schema.decodeUnknownSync(Info)
     const stored = (row: typeof CredentialTable.$inferSelect) => {
       if (!row.integration_id) return
-      return new Info({
+      return new Stored({
         id: row.id,
         integrationID: row.integration_id,
         label: row.label,
@@ -92,7 +106,7 @@ const layer = Layer.effect(
         return row ? stored(row) : undefined
       }),
       create: Effect.fn("Credential.create")(function* (input) {
-        const credential = new Info({
+        const credential = new Stored({
           id: ID.create(),
           integrationID: input.integrationID,
           label: input.label ?? "default",
@@ -135,4 +149,4 @@ const layer = Layer.effect(
   }),
 )
 
-export const node = makeGlobalNode({ service: Service, layer, deps: [Database.node] })
+export const defaultLayer = layer.pipe(Layer.provide(Database.defaultLayer))

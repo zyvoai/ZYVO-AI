@@ -1,6 +1,5 @@
 import { describe, expect } from "bun:test"
 import { Cause, Effect, Exit, Schema, Scope } from "effect"
-import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
 import { SystemContext } from "@opencode-ai/core/system-context"
 import { SystemContextRegistry } from "@opencode-ai/core/system-context/registry"
 import { testEffect } from "../lib/effect"
@@ -18,7 +17,7 @@ const entry = (key: string, text: string, sourceKey = key) => ({
   ),
 })
 
-const it = testEffect(AppNodeBuilder.build(SystemContextRegistry.node))
+const it = testEffect(SystemContextRegistry.layer)
 
 describe("SystemContextRegistry", () => {
   it.effect("loads empty system context when there are no entries", () =>

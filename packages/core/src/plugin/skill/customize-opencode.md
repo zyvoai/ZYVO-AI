@@ -40,7 +40,7 @@ already-loaded config until then.
 | Scope                         | Path                                                                                                                      |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | Project config                | `./opencode.json`, `./opencode.jsonc`, or `.opencode/opencode.json` (opencode walks up from the cwd to the worktree root) |
-| Global config                 | `~/.config/opencode/opencode.json` or `~/.config/opencode/opencode.jsonc` (NOT `~/.opencode/`)                            |
+| Global config                 | `~/.config/opencode/opencode.json` (NOT `~/.opencode/`)                                                                   |
 | Project agents                | `.opencode/agent/<name>.md` or `.opencode/agents/<name>.md`                                                               |
 | Global agents                 | `~/.config/opencode/agent(s)/<name>.md`                                                                                   |
 | Project commands              | `.opencode/command/<name>.md` or `.opencode/commands/<name>.md`                                                           |
@@ -112,7 +112,7 @@ Every field is optional.
       "type": "local",
       "command": ["npx", "-y", "@playwright/mcp"],
       "enabled": true,
-      "environment": {}
+      "env": {}
     },
     "remote-thing": {
       "type": "remote",
@@ -371,7 +371,7 @@ Special object-shaped (not callbacks): `tool: { my_tool: { ... } }`,
       "type": "local",
       "command": ["npx", "-y", "@playwright/mcp"],
       "enabled": true,
-      "environment": { "BROWSER": "chromium" }
+      "env": { "BROWSER": "chromium" }
     },
     "github": {
       "type": "remote",
@@ -384,8 +384,7 @@ Special object-shaped (not callbacks): `tool: { my_tool: { ... } }`,
 }
 ```
 
-`command` is an array of strings. `environment` sets environment variables for
-a local MCP server. `type` is required. Use `enabled: false` to
+`command` is an array of strings. `type` is required. Use `enabled: false` to
 disable a server inherited from a parent config. String values such as header
 tokens support `{env:VAR}` interpolation (and `{file:path}`); the shell-style
 `${VAR}` is not substituted.

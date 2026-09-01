@@ -6,10 +6,9 @@ import { Effect, Exit, Stream } from "effect"
 import type * as PlatformError from "effect/PlatformError"
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
-import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { testEffect } from "../lib/effect"
 
-const live = LayerNode.compile(CrossSpawnSpawner.node)
+const live = CrossSpawnSpawner.defaultLayer
 const fx = testEffect(live)
 
 function js(code: string, opts?: ChildProcess.CommandOptions) {

@@ -30,8 +30,7 @@ import {
   type SetSessionModeResponse,
 } from "@agentclientprotocol/sdk"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
-import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
-import type { AssistantMessage, Message, OpencodeClient, SessionMessageResponse } from "@opencode-ai/sdk/v2"
+import type { Message, OpencodeClient, SessionMessageResponse } from "@opencode-ai/sdk/v2"
 import { Context, Effect, Layer, ManagedRuntime } from "effect"
 import * as ACPError from "./error"
 import { buildConfigOptions, parseModelSelection } from "./config-option"
@@ -88,8 +87,6 @@ export function make(input: {
     ? ACPEvent.start({ sdk: input.sdk, connection: input.connection, session })
     : undefined
   if (events) input.eventSubscription?.(events)
-  const runUntilIdle = <A>(sessionId: string, fn: () => Promise<A>) =>
-    events ? events.runUntilIdle(sessionId, fn) : fn()
 
   const initialize = Effect.fn("ACP.initialize")(function* (params: InitializeRequest) {
     const started = performance.now()
@@ -317,6 +314,7 @@ export function make(input: {
 
     yield* registerMcpServers(input.sdk, registeredMcp, params.cwd, state.id, params.mcpServers ?? [])
     yield* sendAvailableCommands(input.connection, state.id, snapshot)
+    yield* replayMessages(events, messages)
 
     return {
       configOptions: configOptions(snapshot, {
@@ -506,96 +504,89 @@ export function make(input: {
       if (!command) {
         const response = yield* request(
           () =>
-            runUntilIdle(current.id, () =>
-              input.sdk.session.prompt(
-                {
-                  sessionID: current.id,
-                  model: {
-                    providerID: selected.providerID,
-                    modelID: selected.modelID,
-                  },
-                  ...(variant ? { variant } : {}),
-                  parts,
-                  ...(modeId ? { agent: modeId } : {}),
-                  directory: current.cwd,
+            input.sdk.session.prompt(
+              {
+                sessionID: current.id,
+                model: {
+                  providerID: selected.providerID,
+                  modelID: selected.modelID,
                 },
-                { throwOnError: true },
-              ),
+                ...(variant ? { variant } : {}),
+                parts,
+                ...(modeId ? { agent: modeId } : {}),
+                directory: current.cwd,
+              },
+              { throwOnError: true },
             ),
           "session",
         )
         yield* sendUsageUpdate(input.usage, input.sdk, input.connection, current.id, current.cwd)
-        return yield* promptResponse(response.info, params.messageId)
+        return promptResponse(response.info, params.messageId)
       }
 
       const known = snapshot.availableCommands.find((item) => item.name === command.name)
       if (known) {
         const response = yield* request(
           () =>
-            runUntilIdle(current.id, () =>
-              input.sdk.session.command(
-                {
-                  sessionID: current.id,
-                  command: known.name,
-                  arguments: command.args,
-                  model: `${selected.providerID}/${selected.modelID}`,
-                  ...(variant ? { variant } : {}),
-                  ...(modeId ? { agent: modeId } : {}),
-                  directory: current.cwd,
-                },
-                { throwOnError: true },
-              ),
+            input.sdk.session.command(
+              {
+                sessionID: current.id,
+                command: known.name,
+                arguments: command.args,
+                model: `${selected.providerID}/${selected.modelID}`,
+                ...(variant ? { variant } : {}),
+                ...(modeId ? { agent: modeId } : {}),
+                directory: current.cwd,
+              },
+              { throwOnError: true },
             ),
           "session",
         )
         yield* sendUsageUpdate(input.usage, input.sdk, input.connection, current.id, current.cwd)
-        return yield* promptResponse(response.info, params.messageId)
+        return promptResponse(response.info, params.messageId)
       }
 
       if (command.name === "compact") {
         yield* request(
           () =>
-            runUntilIdle(current.id, () =>
-              input.sdk.session.summarize(
-                {
-                  sessionID: current.id,
-                  directory: current.cwd,
-                  providerID: selected.providerID,
-                  modelID: selected.modelID,
-                },
-                { throwOnError: true },
-              ),
+            input.sdk.session.summarize(
+              {
+                sessionID: current.id,
+                directory: current.cwd,
+                providerID: selected.providerID,
+                modelID: selected.modelID,
+              },
+              { throwOnError: true },
             ),
           "session",
         )
       }
 
       yield* sendUsageUpdate(input.usage, input.sdk, input.connection, current.id, current.cwd)
-      return yield* promptResponse(undefined, params.messageId)
+      return promptResponse(undefined, params.messageId)
     }),
     cancel,
   }
 }
 
 function makeSessionService() {
-  return ManagedRuntime.make(AppNodeBuilder.build(ACPSession.node)).runSync(
+  return ManagedRuntime.make(ACPSession.defaultLayer).runSync(
     ACPSession.Service.use((service) => Effect.succeed(service)),
   )
 }
 
 function makeDirectoryService(sdk: OpencodeClient) {
   return ManagedRuntime.make(
-    AppNodeBuilder.build(Directory.node, [
-      [
-        Directory.loaderNode,
+    Directory.layer.pipe(
+      Layer.provide(
         Layer.succeed(
           Directory.Loader,
           Directory.Loader.of({
             load: (directory) => request(() => loadDirectorySnapshot(sdk, directory), "directory"),
           }),
         ),
-      ],
-    ]),
+      ),
+    ),
   ).runSync(Directory.Service.use((service) => Effect.succeed(service)))
 }
 
@@ -656,7 +647,7 @@ function makeUsageService(sdk: OpencodeClient) {
           sessionId: params.sessionID,
           update: {
             sessionUpdate: "usage_update",
-            used: UsageService.contextTokens(message),
+            used: message.tokens.input + message.tokens.cache.read,
             size,
             cost: { amount: UsageService.totalSessionCost(messages), currency: "USD" },
           },
@@ -704,8 +695,7 @@ type MessageInfo = {
   readonly agent?: Message["agent"]
 }
 
-type AssistantError = NonNullable<AssistantMessage["error"]>
-type AssistantInfo = (UsageService.AssistantTokenCost & Pick<AssistantMessage, "error">) | undefined
+type AssistantInfo = UsageService.AssistantTokenCost | undefined
 
 function request<T>(fn: () => Promise<T | SdkResponse<T>>, service?: string) {
   return Effect.tryPromise({
@@ -821,60 +811,13 @@ function detectSlashCommand(parts: ReturnType<typeof promptContentToParts>) {
   return { name, args: rest.join(" ").trim() }
 }
 
-const promptResponse = Effect.fn("ACP.promptResponse")(function* (
-  info: AssistantInfo,
-  messageId: string | null | undefined,
-) {
-  if (!info?.error) {
-    return {
-      stopReason: "end_turn" as const,
-      ...(info ? { usage: UsageService.buildUsage(info) } : {}),
-      ...(messageId ? { userMessageId: messageId } : {}),
-      _meta: {},
-    }
-  }
-
-  const base = {
-    usage: UsageService.buildUsage(info),
+function promptResponse(info: AssistantInfo, messageId: string | null | undefined): PromptResponse {
+  return {
+    stopReason: "end_turn",
+    ...(info ? { usage: UsageService.buildUsage(info) } : {}),
     ...(messageId ? { userMessageId: messageId } : {}),
     _meta: {},
   }
-
-  if (info.error.name === "MessageAbortedError") {
-    return {
-      stopReason: "cancelled" as const,
-      ...base,
-    }
-  }
-
-  if (info.error.name === "MessageOutputLengthError") {
-    return {
-      stopReason: "max_tokens" as const,
-      ...base,
-    }
-  }
-
-  if (info.error.name === "ContentFilterError") {
-    return {
-      stopReason: "refusal" as const,
-      ...base,
-    }
-  }
-
-  if (info.error.name === "ProviderAuthError") {
-    return yield* new ACPError.AuthRequiredError({ providerId: info.error.data.providerID })
-  }
-
-  return yield* new ACPError.ServiceFailureError({
-    service: "session",
-    safeMessage: promptErrorMessage(info.error),
-    errorName: info.error.name,
-  })
-})
-
-function promptErrorMessage(error: AssistantError) {
-  if ("message" in error.data && typeof error.data.message === "string") return error.data.message
-  return "OpenCode prompt failed"
 }
 
 function sendUsageUpdate(

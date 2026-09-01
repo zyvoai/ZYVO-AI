@@ -1,5 +1,4 @@
 import { afterEach, expect } from "bun:test"
-import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { Effect } from "effect"
 import { fileURLToPath } from "url"
@@ -7,7 +6,7 @@ import { InstanceRef } from "../../src/effect/instance-ref"
 import { disposeAllInstances, TestInstance } from "../fixture/fixture"
 import { testEffect } from "../lib/effect"
 
-const it = testEffect(LayerNode.compile(FSUtil.node))
+const it = testEffect(FSUtil.defaultLayer)
 
 afterEach(async () => {
   await disposeAllInstances()

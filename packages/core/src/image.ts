@@ -1,6 +1,5 @@
 export * as Image from "./image"
 
-import { makeLocationNode } from "./effect/app-node"
 import { Context, Effect, Layer, Schema } from "effect"
 import { Config } from "./config"
 import { FileSystem } from "./filesystem"
@@ -44,7 +43,7 @@ export interface Interface {
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Image") {}
 
-const layer = Layer.effect(
+export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const config = yield* Config.Service
@@ -77,5 +76,3 @@ const layer = Layer.effect(
 )
 
 export const locationLayer = layer.pipe(Layer.provide(Config.locationLayer))
-
-export const node = makeLocationNode({ service: Service, layer, deps: [Config.node] })

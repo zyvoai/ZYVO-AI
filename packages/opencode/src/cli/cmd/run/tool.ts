@@ -623,18 +623,20 @@ function snapQuestion(p: ToolProps<typeof QuestionTool>): ToolSnapshot {
 
 function scrollBashStart(p: ToolProps<typeof BashTool>): string {
   const cmd = p.input.command ?? ""
+  const desc = p.input.description || "Shell"
   const wd = p.input.workdir ?? ""
-  const formatted = wd && wd !== "." ? toolPath(wd) : ""
-  const dir = formatted === "." ? "" : formatted
-  if (cmd && !dir) {
+  const dir = wd && wd !== "." ? toolPath(wd) : ""
+  if (cmd && desc === "Shell" && !dir) {
     return `$ ${cmd}`
   }
 
+  const title = dir && !desc.includes(dir) ? `${desc} in ${dir}` : desc
+
   if (!cmd) {
-    return dir ? `# Running in ${dir}` : ""
+    return `# ${title}`
   }
 
-  return `# Running in ${dir}\n$ ${cmd}`
+  return `# ${title}\n$ ${cmd}`
 }
 
 function scrollBashProgress(p: ToolProps<typeof BashTool>): string {
@@ -966,10 +968,11 @@ function permList(p: ToolPermissionProps): ToolPermissionInfo {
 }
 
 function permBash(p: ToolPermissionProps<typeof BashTool>): ToolPermissionInfo {
+  const title = p.input.description || "Shell command"
   const cmd = p.input.command || ""
   return {
     icon: "#",
-    title: "Shell command",
+    title,
     lines: cmd ? [`$ ${cmd}`] : p.patterns.map((item) => `- ${item}`),
   }
 }

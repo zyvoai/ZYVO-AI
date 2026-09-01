@@ -3,12 +3,13 @@ import fs from "fs/promises"
 import path from "path"
 import { pathToFileURL } from "url"
 import { Effect, Layer } from "effect"
-import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
-import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+import { FSUtil } from "@opencode-ai/core/fs-util"
+import { Git } from "@opencode-ai/core/git"
 import { Global } from "@opencode-ai/core/global"
 import { Repository } from "@opencode-ai/core/repository"
 import { RepositoryCache } from "@opencode-ai/core/repository-cache"
-import { branch, git, gitRemote } from "./fixture/git"
+import { EffectFlock } from "@opencode-ai/core/util/effect-flock"
+import { git, gitRemote } from "./fixture/git"
 import { tmpdir } from "./fixture/tmpdir"
 import { testEffect } from "./lib/effect"
 
@@ -66,41 +67,6 @@ describe("RepositoryCache", () => {
     ),
   )
 
-  it.live("keeps branch checkouts isolated from branchless refreshes", () =>
-    withRemote((fixture) =>
-      Effect.gen(function* () {
-        yield* Effect.promise(() => branch(fixture.source, "feature", "two\n"))
-        const cache = yield* RepositoryCache.Service
-
-        const featured = yield* cache.ensure({ reference: fixture.reference, branch: "feature" })
-        expect(featured.branch).toBe("feature")
-        expect(featured.localPath.endsWith("repo@feature")).toBe(true)
-        expect(yield* read(path.join(featured.localPath, "README.md"))).toBe("two\n")
-
-        const refreshed = yield* cache.ensure({ reference: fixture.reference, refresh: true })
-        expect(refreshed.localPath).not.toBe(featured.localPath)
-        expect(yield* read(path.join(refreshed.localPath, "README.md"))).toBe("one\n")
-
-        const cached = yield* cache.ensure({ reference: fixture.reference, branch: "feature" })
-        expect(cached.status).toBe("cached")
-        expect(yield* read(path.join(cached.localPath, "README.md"))).toBe("two\n")
-      }).pipe(Effect.provide(cacheLayer(fixture.root))),
-    ),
-  )
-
-  it.live("does not mistake an enclosing repository for the cache checkout", () =>
-    withRemote((fixture) =>
-      Effect.gen(function* () {
-        yield* Effect.promise(() => git(fixture.root, "clone", fixture.remote, path.join(fixture.root, "repos")))
-
-        const result = yield* (yield* RepositoryCache.Service).ensure({ reference: fixture.reference })
-
-        expect(result.status).toBe("cloned")
-        expect(yield* read(path.join(result.localPath, "README.md"))).toBe("one\n")
-      }).pipe(Effect.provide(cacheLayer(fixture.root))),
-    ),
-  )
-
   it.live("returns typed validation and clone failures", () =>
     withRemote((fixture) =>
       Effect.gen(function* () {
@@ -123,9 +89,15 @@ describe("RepositoryCache", () => {
 })
 
 function cacheLayer(root: string) {
-  return AppNodeBuilder.build(RepositoryCache.node, [
-    [Global.node, Global.layerWith({ state: path.join(root, "state"), repos: path.join(root, "repos") })],
-  ])
+  const dependencies = Layer.mergeAll(
+    Global.layerWith({ state: path.join(root, "state"), repos: path.join(root, "repos") }),
+    FSUtil.defaultLayer,
+  )
+  return RepositoryCache.layer.pipe(
+    Layer.provide(EffectFlock.layer.pipe(Layer.provide(dependencies))),
+    Layer.provide(Git.defaultLayer),
+    Layer.provide(dependencies),
+  )
 }
 
 function withRemote<A, E, R>(body: (fixture: Awaited<ReturnType<typeof gitRemote>>) => Effect.Effect<A, E, R>) {

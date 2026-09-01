@@ -1,5 +1,4 @@
 import { afterEach, expect } from "bun:test"
-import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { Cause, Effect, Exit, Layer } from "effect"
 import path from "path"
 import { disposeAllInstances, TestInstance } from "../fixture/fixture"
@@ -15,11 +14,17 @@ import { Plugin } from "../../src/plugin"
 import { Provider } from "../../src/provider/provider"
 import { Skill } from "../../src/skill"
 import { Truncate } from "../../src/tool/truncate"
+import { LocationServiceMap } from "@opencode-ai/core/location-layer"
 
 const agentLayer = (flags: Partial<RuntimeFlags.Info> = {}) =>
-  LayerNode.compile(
-    LayerNode.group([Agent.node, Plugin.node, Provider.node, Auth.node, Config.node, Skill.node, RuntimeFlags.node]),
-    [[RuntimeFlags.node, RuntimeFlags.layer(flags)]],
+  Agent.layer.pipe(
+    Layer.provide(Plugin.defaultLayer),
+    Layer.provide(Provider.defaultLayer),
+    Layer.provide(Auth.defaultLayer),
+    Layer.provide(Config.defaultLayer),
+    Layer.provide(Skill.defaultLayer),
+    Layer.provide(LocationServiceMap.layer),
+    Layer.provide(RuntimeFlags.layer(flags)),
   )
 
 const it = testEffect(agentLayer())

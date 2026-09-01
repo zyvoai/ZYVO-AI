@@ -9,7 +9,6 @@ import { Location } from "./location"
 import { AbsolutePath } from "./schema"
 import { SystemContext } from "./system-context/index"
 import { SystemContextRegistry } from "./system-context/registry"
-import { makeLocationNode } from "./effect/app-node"
 
 class File extends Schema.Class<File>("InstructionContext.File")({
   path: AbsolutePath,
@@ -19,7 +18,7 @@ class File extends Schema.Class<File>("InstructionContext.File")({
 const Files = Schema.Array(File)
 const key = SystemContext.Key.make("core/instructions")
 
-const layer = Layer.effectDiscard(
+export const layer = Layer.effectDiscard(
   Effect.gen(function* () {
     const fs = yield* FSUtil.Service
     const global = yield* Global.Service
@@ -38,24 +37,22 @@ const layer = Layer.effectDiscard(
       })
 
     const observe = Effect.fn("InstructionContext.observe")(function* () {
-      const start = yield* fs.resolve(location.directory)
-      const stop = yield* fs.resolve(location.project.directory)
+      const start = FSUtil.resolve(location.directory)
+      const stop = FSUtil.resolve(location.project.directory)
       const fromProject = relative(stop, start)
       const insideProject =
         fromProject === "" || (fromProject !== ".." && !fromProject.startsWith(`..${sep}`) && !isAbsolute(fromProject))
       const discovered = new Set(
-        yield* Effect.forEach(
-          Flag.OPENCODE_DISABLE_PROJECT_CONFIG || !insideProject
-            ? []
-            : yield* fs.up({
-                targets: ["AGENTS.md"],
-                start,
-                stop,
-              }),
-          fs.resolve,
-        ),
+        (Flag.OPENCODE_DISABLE_PROJECT_CONFIG || !insideProject
+          ? []
+          : yield* fs.up({
+              targets: ["AGENTS.md"],
+              start,
+              stop,
+            })
+        ).map(FSUtil.resolve),
       )
-      const paths = Array.dedupe([yield* fs.resolve(join(global.config, "AGENTS.md")), ...discovered])
+      const paths = Array.dedupe([FSUtil.resolve(join(global.config, "AGENTS.md")), ...discovered])
       const files = yield* Effect.forEach(
         paths,
         (path) =>
@@ -89,12 +86,6 @@ const layer = Layer.effectDiscard(
     })
   }),
 )
-
-export const node = makeLocationNode({
-  name: "instruction-context",
-  layer,
-  deps: [FSUtil.node, Global.node, Location.node, SystemContextRegistry.node],
-})
 
 function render(files: ReadonlyArray<File>) {
   return files.map((file) => `Instructions from: ${file.path}\n${file.content}`).join("\n\n")

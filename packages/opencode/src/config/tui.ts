@@ -2,8 +2,6 @@ export * as TuiConfig from "./tui"
 
 import path from "path"
 import { mergeDeep, unique } from "remeda"
-import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
-import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { Cause, Context, Effect, Fiber, Layer } from "effect"
 import { ConfigParse } from "@/config/parse"
 import * as ConfigPaths from "@/config/paths"
@@ -225,7 +223,7 @@ const loadState = Effect.fn("TuiConfig.loadState")(function* (ctx: { directory: 
   }
 })
 
-const layer = Layer.effect(
+export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const directory = yield* CurrentWorkingDirectory
@@ -259,9 +257,9 @@ const layer = Layer.effect(
   }).pipe(Effect.withSpan("TuiConfig.layer")),
 )
 
-export const node = LayerNode.make({ service: Service, layer, deps: [Npm.node, FSUtil.node] })
+export const defaultLayer = layer.pipe(Layer.provide(Npm.defaultLayer), Layer.provide(FSUtil.defaultLayer))
 
-const { runPromise } = makeRuntime(Service, AppNodeBuilder.build(node))
+const { runPromise } = makeRuntime(Service, defaultLayer)
 
 export async function waitForDependencies() {
   await runPromise((svc) => svc.waitForDependencies())

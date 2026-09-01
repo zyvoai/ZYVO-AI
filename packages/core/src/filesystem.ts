@@ -1,14 +1,14 @@
 export * as FileSystem from "./filesystem"
 
-import { makeLocationNode } from "./effect/app-node"
 import path from "path"
 import { Context, Effect, Layer, Schema } from "effect"
+import { EventV2 } from "./event"
 import { FSUtil } from "./fs-util"
 import { Location } from "./location"
 import { PositiveInt, RelativePath } from "./schema"
 import { FileSystemSearch } from "./filesystem/search"
-import { Entry, FileSystem, FindInput, Match } from "@opencode-ai/schema/filesystem"
-export { Entry, Match, Submatch } from "@opencode-ai/schema/filesystem"
+import { Entry, Match } from "./filesystem/schema"
+export { Entry, Match, Submatch } from "./filesystem/schema"
 
 export const ReadInput = Schema.Struct({
   path: RelativePath,
@@ -29,7 +29,11 @@ export const ListInput = Schema.Struct({
 })
 export type ListInput = typeof ListInput.Type
 
-export { FindInput }
+export class FindInput extends Schema.Class<FindInput>("FileSystem.FindInput")({
+  query: Schema.String,
+  type: Schema.Literals(["file", "directory"]).pipe(Schema.optional),
+  limit: PositiveInt.pipe(Schema.optional),
+}) {}
 
 export class GlobInput extends Schema.Class<GlobInput>("FileSystem.GlobInput")({
   pattern: Schema.String,
@@ -44,7 +48,14 @@ export class GrepInput extends Schema.Class<GrepInput>("FileSystem.GrepInput")({
   limit: PositiveInt.pipe(Schema.optional),
 }) {}
 
-export const Event = FileSystem.Event
+export const Event = {
+  Edited: EventV2.define({
+    type: "file.edited",
+    schema: {
+      file: Schema.String,
+    },
+  }),
+}
 
 export interface Interface {
   readonly read: (input: ReadInput) => Effect.Effect<{ readonly content: Uint8Array; readonly mime: string }>
@@ -97,9 +108,10 @@ const baseLayer = Layer.effect(
                 const absolute = path.join(target.absolute, item.name)
                 const relative = path.relative(target.directory, absolute)
                 return [
-                  Entry.make({
+                  new Entry({
                     path: RelativePath.make(relative + (item.type === "directory" ? path.sep : "")),
                     type: item.type,
+                    mime: item.type === "directory" ? "application/x-directory" : FSUtil.mimeType(absolute),
                   }),
                 ]
               })
@@ -111,8 +123,6 @@ const baseLayer = Layer.effect(
   }),
 )
 
-export const node = makeLocationNode({
-  service: Service,
-  layer: baseLayer,
-  deps: [FSUtil.node, Location.node, FileSystemSearch.node],
-})
+export const layer = baseLayer.pipe(Layer.provide(FileSystemSearch.defaultLayer), Layer.provide(FSUtil.defaultLayer))
+
+export const locationLayer = layer

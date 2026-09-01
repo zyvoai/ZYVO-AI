@@ -1,18 +1,17 @@
 import { afterEach, describe, expect, spyOn } from "bun:test"
-import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { Effect, Layer } from "effect"
 import fs from "fs/promises"
 import path from "path"
 import { pathToFileURL } from "url"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import { FSUtil } from "@opencode-ai/core/fs-util"
-import { Config } from "@/config/config"
 import { disposeAllInstances, provideInstance, testInstanceStoreLayer, tmpdirScoped } from "../fixture/fixture"
 import { testEffect } from "../lib/effect"
 
 const { Plugin } = await import("../../src/plugin/index")
 const { PluginLoader } = await import("../../src/plugin/loader")
 const { readPackageThemes } = await import("../../src/plugin/shared")
+const { EventV2Bridge } = await import("../../src/event-v2-bridge")
 const { Npm } = await import("@opencode-ai/core/npm")
 const { TestConfig } = await import("../fixture/config")
 const { RuntimeFlags } = await import("../../src/effect/runtime-flags")
@@ -21,9 +20,7 @@ afterEach(async () => {
   await disposeAllInstances()
 })
 
-const it = testEffect(
-  Layer.mergeAll(LayerNode.compile(LayerNode.group([CrossSpawnSpawner.node, FSUtil.node])), testInstanceStoreLayer),
-)
+const it = testEffect(Layer.mergeAll(CrossSpawnSpawner.defaultLayer, FSUtil.defaultLayer, testInstanceStoreLayer))
 
 function withTmp<T, A, E, R>(
   init: (dir: string) => Promise<T>,
@@ -48,9 +45,10 @@ function load(dir: string, flags?: Parameters<typeof RuntimeFlags.layer>[0]) {
       yield* plugin.list()
     }).pipe(
       Effect.provide(
-        LayerNode.compile(Plugin.node, [
-          [
-            Config.node,
+        Plugin.layer.pipe(
+          Layer.provide(EventV2Bridge.defaultLayer),
+          Layer.provide(RuntimeFlags.layer({ disableDefaultPlugins: true, ...flags })),
+          Layer.provide(
             TestConfig.layer({
               get: () =>
                 Effect.succeed({
@@ -59,9 +57,8 @@ function load(dir: string, flags?: Parameters<typeof RuntimeFlags.layer>[0]) {
                 }),
               directories: () => Effect.succeed([dir]),
             }),
-          ],
-          [RuntimeFlags.node, RuntimeFlags.layer({ disableDefaultPlugins: true, ...flags })],
-        ]),
+          ),
+        ),
       ),
       provideInstance(dir),
     )

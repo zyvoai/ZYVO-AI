@@ -60,8 +60,40 @@ export interface Interface {
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Storage") {}
 
+// ZYVO: when ZYVO_SESSION_ROOT points at a browsable folder (the phone's
+// shared storage), keep small human-facing data — projects and sessions —
+// there, while heavy streaming data (messages/parts) stays on the fast
+// private data dir. Reads and writes both resolve through file()/list(), so
+// the redirect stays consistent.
+function zyvoDirFor(key: string[]): string | undefined {
+  const root = process.env.ZYVO_SESSION_ROOT
+  if (!root) return undefined
+  if (key[0] === "session" || key[0] === "project") return path.join(root, "storage")
+  return undefined
+}
+
 function file(dir: string, key: string[]) {
-  return path.join(dir, ...key) + ".json"
+  return path.join(zyvoDirFor(key) ?? dir, ...key) + ".json"
+}
+
+// ZYVO: mirror each session write into a human-named folder so sessions are
+// easy to spot in a file manager: <root>/sessions/<title-or-id>/info.json
+function zyvoMirrorTarget(target: string, content: unknown): string | undefined {
+  const root = process.env.ZYVO_SESSION_ROOT
+  if (!root) return undefined
+  if (!target.includes(`${path.sep}storage${path.sep}session${path.sep}`)) return undefined
+  if (typeof content !== "object" || content === null) return undefined
+  const info = content as Record<string, unknown>
+  if (typeof info.id !== "string") return undefined
+  const title = typeof info.title === "string" ? info.title.trim() : ""
+  const safe =
+    (title || info.id)
+      .replace(/[/\\:*?"<>|]/g, "-")
+      // eslint-disable-next-line no-control-regex
+      .replace(/[\x00-\x1f]/g, "")
+      .trim()
+      .slice(0, 60) || info.id
+  return path.join(root, "sessions", safe, "info.json")
 }
 
 function missing(err: unknown) {
@@ -210,7 +242,7 @@ const MIGRATIONS: Migration[] = [
   }),
 ]
 
-const layer = Layer.effect(
+export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const fs = yield* FSUtil.Service
@@ -250,6 +282,12 @@ const layer = Layer.effect(
 
     const writeJson = Effect.fnUntraced(function* (target: string, content: unknown) {
       yield* fs.writeWithDirs(target, JSON.stringify(content, null, 2))
+      const mirror = zyvoMirrorTarget(target, content)
+      if (mirror) {
+        yield* fs
+          .writeWithDirs(mirror, JSON.stringify(content, null, 2))
+          .pipe(Effect.catchAll(() => Effect.void))
+      }
     })
 
     const withResolved = <A, E>(
@@ -299,7 +337,7 @@ const layer = Layer.effect(
       })
 
     const list: Interface["list"] = Effect.fn("Storage.list")(function* (prefix: string[]) {
-      const dir = (yield* state).dir
+      const dir = zyvoDirFor(prefix) ?? (yield* state).dir
       const cwd = path.join(dir, ...prefix)
       const result = yield* fs
         .glob("**/*", {
@@ -322,6 +360,8 @@ const layer = Layer.effect(
   }),
 )
 
-export const node = LayerNode.make({ service: Service, layer: layer, deps: [FSUtil.node, Git.node] })
+export const defaultLayer = layer.pipe(Layer.provide(FSUtil.defaultLayer), Layer.provide(Git.defaultLayer))
+
+export const node = LayerNode.make(layer, [FSUtil.node, Git.node])
 
 export * as Storage from "./storage"

@@ -5,7 +5,7 @@ import os from "os"
 import { setTimeout as sleep } from "node:timers/promises"
 import { createServer } from "http"
 import { OpenAIWebSocketPool } from "./ws-pool"
-import { OauthCallbackPage } from "@opencode-ai/core/oauth/page"
+import { escapeHtml } from "@/util/html"
 
 const CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann"
 const ISSUER = "https://auth.openai.com"
@@ -13,7 +13,6 @@ const CODEX_API_ENDPOINT = "https://chatgpt.com/backend-api/codex/responses"
 const OAUTH_PORT = 1455
 const OAUTH_POLLING_SAFETY_MARGIN_MS = 3000
 const ALLOWED_MODELS = new Set(["gpt-5.5", "gpt-5.3-codex-spark", "gpt-5.4", "gpt-5.4-mini"])
-const DISALLOWED_MODELS = new Set(["gpt-5.5-pro"])
 
 interface PkceCodes {
   verifier: string
@@ -37,12 +36,10 @@ function base64UrlEncode(buffer: ArrayBuffer): string {
 
 export interface IdTokenClaims {
   chatgpt_account_id?: string
-  chatgpt_compute_residency?: string
   organizations?: Array<{ id: string }>
   email?: string
   "https://api.openai.com/auth"?: {
     chatgpt_account_id?: string
-    chatgpt_compute_residency?: string
   }
 }
 
@@ -75,14 +72,6 @@ export function extractAccountId(tokens: TokenResponse): string | undefined {
     return claims ? extractAccountIdFromClaims(claims) : undefined
   }
   return undefined
-}
-
-export function extractResidency(token: string): string | undefined {
-  const claims = parseJwtClaims(token)
-  const residency =
-    claims?.["https://api.openai.com/auth"]?.chatgpt_compute_residency ?? claims?.chatgpt_compute_residency
-  if (!residency || residency === "no_constraint") return undefined
-  return residency
 }
 
 function buildAuthorizeUrl(redirectUri: string, pkce: PkceCodes, state: string): string {
@@ -148,8 +137,95 @@ async function refreshAccessToken(refreshToken: string, issuer = ISSUER): Promis
   return response.json()
 }
 
-// Kept as a named export for plugin.codex tests; delegates to the shared branded page.
-export const renderOAuthError = (error: string) => OauthCallbackPage.error(error, { provider: "ChatGPT" })
+const HTML_SUCCESS = `<!doctype html>
+<html>
+  <head>
+    <title>OpenCode - Codex Authorization Successful</title>
+    <style>
+      body {
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        margin: 0;
+        background: #131010;
+        color: #f1ecec;
+      }
+      .container {
+        text-align: center;
+        padding: 2rem;
+      }
+      h1 {
+        color: #f1ecec;
+        margin-bottom: 1rem;
+      }
+      p {
+        color: #b7b1b1;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Authorization Successful</h1>
+      <p>You can close this window and return to OpenCode.</p>
+    </div>
+    <script>
+      setTimeout(() => window.close(), 2000)
+    </script>
+  </body>
+</html>`
+
+export const renderOAuthError = (error: string) => `<!doctype html>
+<html>
+  <head>
+    <title>OpenCode - Codex Authorization Failed</title>
+    <style>
+      body {
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        margin: 0;
+        background: #131010;
+        color: #f1ecec;
+      }
+      .container {
+        text-align: center;
+        padding: 2rem;
+      }
+      h1 {
+        color: #fc533a;
+        margin-bottom: 1rem;
+      }
+      p {
+        color: #b7b1b1;
+      }
+      .error {
+        color: #ff917b;
+        font-family: monospace;
+        margin-top: 1rem;
+        padding: 1rem;
+        background: #3c140d;
+        border-radius: 0.5rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Authorization Failed</h1>
+      <p>An error occurred during authorization.</p>
+      <div class="error">${escapeHtml(error)}</div>
+    </div>
+  </body>
+</html>`
 
 interface PendingOAuth {
   pkce: PkceCodes
@@ -210,7 +286,7 @@ async function startOAuthServer(): Promise<{ port: number; redirectUri: string }
         .catch((err) => current.reject(err))
 
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" })
-      res.end(OauthCallbackPage.success({ provider: "ChatGPT" }))
+      res.end(HTML_SUCCESS)
       return
     }
 
@@ -293,10 +369,7 @@ export async function CodexAuthPlugin(input: PluginInput, options: CodexAuthPlug
         return Object.fromEntries(
           Object.entries(provider.models)
             .filter(([, model]) => {
-              if (model.options.reasoningMode === "pro") return false
               if (ALLOWED_MODELS.has(model.api.id)) return true
-              if (DISALLOWED_MODELS.has(model.api.id)) return false
-              if (model.api.id === "gpt-5.6") return false
               const match = model.api.id.match(/^gpt-(\d+\.\d+)/)
               return match ? parseFloat(match[1]) > 5.4 : false
             })
@@ -309,14 +382,13 @@ export async function CodexAuthPlugin(input: PluginInput, options: CodexAuthPlug
                   output: 0,
                   cache: { read: 0, write: 0 },
                 },
-                limit:
-                  model.id.includes("gpt-5.5") || model.id.includes("gpt-5.6")
-                    ? {
-                        context: 400_000,
-                        input: 272_000,
-                        output: 128_000,
-                      }
-                    : model.limit,
+                limit: model.id.includes("gpt-5.5")
+                  ? {
+                      context: 400_000,
+                      input: 272_000,
+                      output: 128_000,
+                    }
+                  : model.limit,
               },
             ]),
         )
@@ -416,16 +488,13 @@ export async function CodexAuthPlugin(input: PluginInput, options: CodexAuthPlug
               requestInput instanceof URL
                 ? requestInput
                 : new URL(typeof requestInput === "string" ? requestInput : requestInput.url)
-            const rewrite = parsed.pathname.includes("/v1/responses") || parsed.pathname.includes("/chat/completions")
-            const url = rewrite ? new URL(codexApiEndpoint) : parsed
-            if (rewrite) {
-              const residency = extractResidency(currentAuth.access)
-              if (residency) headers.set("x-openai-internal-codex-residency", residency)
-            }
+            const url =
+              parsed.pathname.includes("/v1/responses") || parsed.pathname.includes("/chat/completions")
+                ? new URL(codexApiEndpoint)
+                : parsed
 
             const requestInit = {
               ...init,
-              body: init?.body,
               headers,
             }
             if (websocketFetch && parsed.pathname.endsWith("/responses")) return websocketFetch(url, requestInit)

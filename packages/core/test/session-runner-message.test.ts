@@ -14,77 +14,44 @@ const id = (value: string) => SessionMessage.ID.make(`msg_${value}`)
 const model = Model.make({ id: "model", provider: "provider", route: OpenAIChat.route })
 
 describe("toLLMMessages", () => {
-  test("omits empty assistant turns", () => {
-    const assistant = (value: string, content: SessionMessage.Assistant["content"]) =>
-      SessionMessage.Assistant.make({
-        id: id(value),
-        type: "assistant",
-        agent: "build",
-        model: { id: ModelV2.ID.make("model"), providerID: ProviderV2.ID.make("provider") },
-        content,
-        time: { created, completed: created },
-      })
-    const messages = toLLMMessages(
-      [
-        assistant("empty", []),
-        assistant("empty-text", [SessionMessage.AssistantText.make({ type: "text", id: "empty", text: "" })]),
-        assistant("empty-reasoning", [
-          SessionMessage.AssistantReasoning.make({ type: "reasoning", id: "empty-reasoning", text: "" }),
-        ]),
-        assistant("text", [SessionMessage.AssistantText.make({ type: "text", id: "text", text: "Partial" })]),
-        assistant("reasoning", [
-          SessionMessage.AssistantReasoning.make({
-            type: "reasoning",
-            id: "reasoning",
-            text: "",
-            providerMetadata: { anthropic: { signature: "sig_1" } },
-          }),
-        ]),
-      ],
-      model,
-    )
-
-    expect(messages.map((message) => message.id)).toEqual([id("text"), id("reasoning")])
-  })
-
   test("maps every top-level V2 Session message type", () => {
-    const file = FileAttachment.make({ uri: "data:image/png;base64,aGVsbG8=", mime: "image/png", name: "hello.png" })
+    const file = new FileAttachment({ uri: "data:image/png;base64,aGVsbG8=", mime: "image/png", name: "hello.png" })
     const messages = toLLMMessages(
       [
-        SessionMessage.AgentSwitched.make({
+        new SessionMessage.AgentSwitched({
           id: id("agent"),
           type: "agent-switched",
           agent: "build",
           time: { created },
         }),
-        SessionMessage.ModelSwitched.make({
+        new SessionMessage.ModelSwitched({
           id: id("model"),
           type: "model-switched",
           model: { id: ModelV2.ID.make("model"), providerID: ProviderV2.ID.make("provider") },
           time: { created },
         }),
-        SessionMessage.System.make({
+        new SessionMessage.System({
           id: id("system"),
           type: "system",
           text: "Updated context\n\nOther context",
           time: { created },
         }),
-        SessionMessage.User.make({
+        new SessionMessage.User({
           id: id("user"),
           type: "user",
           text: "Inspect this image",
           files: [file],
-          agents: [AgentAttachment.make({ name: "build" })],
+          agents: [new AgentAttachment({ name: "build" })],
           time: { created },
         }),
-        SessionMessage.Synthetic.make({
+        new SessionMessage.Synthetic({
           id: id("synthetic"),
           type: "synthetic",
           sessionID: SessionV2.ID.make("ses_translate"),
           text: "Synthetic context",
           time: { created },
         }),
-        SessionMessage.Shell.make({
+        new SessionMessage.Shell({
           id: id("shell"),
           type: "shell",
           callID: "shell-1",
@@ -92,7 +59,7 @@ describe("toLLMMessages", () => {
           output: "/project",
           time: { created, completed: created },
         }),
-        SessionMessage.Compaction.make({
+        new SessionMessage.Compaction({
           id: id("compaction"),
           type: "compaction",
           reason: "auto",
@@ -142,31 +109,31 @@ Recent work
   test("replays durable tool media into canonical tool messages without structured base64", () => {
     const messages = toLLMMessages(
       [
-        SessionMessage.Assistant.make({
+        new SessionMessage.Assistant({
           id: id("assistant"),
           type: "assistant",
           agent: "build",
           model: { id: ModelV2.ID.make("model"), providerID: ProviderV2.ID.make("provider") },
           content: [
-            SessionMessage.AssistantText.make({ type: "text", id: "text-1", text: "Checking" }),
-            SessionMessage.AssistantReasoning.make({
+            new SessionMessage.AssistantText({ type: "text", id: "text-1", text: "Checking" }),
+            new SessionMessage.AssistantReasoning({
               type: "reasoning",
               id: "reasoning-1",
               text: "Think",
               providerMetadata: { anthropic: { signature: "sig_1" } },
             }),
-            SessionMessage.AssistantTool.make({
+            new SessionMessage.AssistantTool({
               type: "tool",
               id: "pending",
               name: "read",
-              state: SessionMessage.ToolStatePending.make({ status: "pending", input: '{"path":"README.md"}' }),
+              state: new SessionMessage.ToolStatePending({ status: "pending", input: '{"path":"README.md"}' }),
               time: { created },
             }),
-            SessionMessage.AssistantTool.make({
+            new SessionMessage.AssistantTool({
               type: "tool",
               id: "running",
               name: "read",
-              state: SessionMessage.ToolStateRunning.make({
+              state: new SessionMessage.ToolStateRunning({
                 status: "running",
                 input: { path: "README.md" },
                 content: [],
@@ -174,11 +141,11 @@ Recent work
               }),
               time: { created },
             }),
-            SessionMessage.AssistantTool.make({
+            new SessionMessage.AssistantTool({
               type: "tool",
               id: "completed",
               name: "read",
-              state: SessionMessage.ToolStateCompleted.make({
+              state: new SessionMessage.ToolStateCompleted({
                 status: "completed",
                 input: { path: "README.md" },
                 content: [
@@ -194,7 +161,7 @@ Recent work
               }),
               time: { created, completed: created },
             }),
-            SessionMessage.AssistantTool.make({
+            new SessionMessage.AssistantTool({
               type: "tool",
               id: "hosted",
               name: "web_search",
@@ -203,7 +170,7 @@ Recent work
                 metadata: { fake: { continuation: "hosted-call" } },
                 resultMetadata: { fake: { continuation: "hosted-result" } },
               },
-              state: SessionMessage.ToolStateCompleted.make({
+              state: new SessionMessage.ToolStateCompleted({
                 status: "completed",
                 input: { query: "Effect" },
                 content: [{ type: "text", text: "Found it" }],
@@ -211,12 +178,12 @@ Recent work
               }),
               time: { created, completed: created },
             }),
-            SessionMessage.AssistantTool.make({
+            new SessionMessage.AssistantTool({
               type: "tool",
               id: "hosted-failed",
               name: "write",
               provider: { executed: true, metadata: { fake: { continuation: "failed" } } },
-              state: SessionMessage.ToolStateError.make({
+              state: new SessionMessage.ToolStateError({
                 status: "error",
                 input: { path: "README.md" },
                 content: [],
@@ -299,13 +266,13 @@ Recent work
   test("restores OpenAI encrypted reasoning metadata", () => {
     const messages = toLLMMessages(
       [
-        SessionMessage.Assistant.make({
+        new SessionMessage.Assistant({
           id: id("assistant-openai-reasoning"),
           type: "assistant",
           agent: "build",
           model: { id: ModelV2.ID.make("model"), providerID: ProviderV2.ID.make("provider") },
           content: [
-            SessionMessage.AssistantReasoning.make({
+            new SessionMessage.AssistantReasoning({
               type: "reasoning",
               id: "reasoning-openai",
               text: "Think",
@@ -327,94 +294,22 @@ Recent work
     ])
   })
 
-  test("drops provider-native continuation metadata from failed assistant turns", () => {
-    const messages = toLLMMessages(
-      [
-        SessionMessage.Assistant.make({
-          id: id("assistant-failed"),
-          type: "assistant",
-          agent: "build",
-          model: { id: ModelV2.ID.make("model"), providerID: ProviderV2.ID.make("provider") },
-          content: [
-            SessionMessage.AssistantReasoning.make({
-              type: "reasoning",
-              id: "reasoning-failed",
-              text: "Partial thought",
-              providerMetadata: { openai: { itemId: "rs_failed", reasoningEncryptedContent: null } },
-            }),
-            SessionMessage.AssistantTool.make({
-              type: "tool",
-              id: "hosted-failed",
-              name: "web_search",
-              provider: {
-                executed: true,
-                metadata: { openai: { itemId: "call_failed" } },
-                resultMetadata: { openai: { itemId: "result_failed" } },
-              },
-              state: SessionMessage.ToolStateError.make({
-                status: "error",
-                input: { query: "Effect" },
-                error: { type: "unknown", message: "Provider turn interrupted" },
-                content: [],
-                structured: {},
-              }),
-              time: { created, completed: created },
-            }),
-          ],
-          finish: "error",
-          error: { type: "unknown", message: "Provider turn interrupted" },
-          time: { created, completed: created },
-        }),
-      ],
-      model,
-    )
-
-    expect(messages[0]?.content).toEqual([
-      { type: "reasoning", text: "Partial thought", providerMetadata: undefined },
-      {
-        type: "tool-call",
-        id: "hosted-failed",
-        name: "web_search",
-        input: { query: "Effect" },
-        providerExecuted: true,
-        providerMetadata: undefined,
-      },
-      {
-        type: "tool-result",
-        id: "hosted-failed",
-        name: "web_search",
-        result: {
-          type: "error",
-          value: {
-            error: { type: "unknown", message: "Provider turn interrupted" },
-            content: [],
-            structured: {},
-          },
-        },
-        providerExecuted: true,
-        cache: undefined,
-        metadata: undefined,
-        providerMetadata: undefined,
-      },
-    ])
-  })
-
   test("drops provider-native continuation metadata after a model switch", () => {
     const messages = toLLMMessages(
       [
-        SessionMessage.Assistant.make({
+        new SessionMessage.Assistant({
           id: id("assistant-old-model"),
           type: "assistant",
           agent: "build",
           model: { id: ModelV2.ID.make("old-model"), providerID: ProviderV2.ID.make("provider") },
           content: [
-            SessionMessage.AssistantReasoning.make({
+            new SessionMessage.AssistantReasoning({
               type: "reasoning",
               id: "reasoning-old-model",
               text: "Visible thought",
               providerMetadata: { anthropic: { signature: "sig_old" } },
             }),
-            SessionMessage.AssistantTool.make({
+            new SessionMessage.AssistantTool({
               type: "tool",
               id: "hosted-old-model",
               name: "web_search",
@@ -423,7 +318,7 @@ Recent work
                 metadata: { openai: { itemId: "hosted-old-model" } },
                 resultMetadata: { openai: { itemId: "hosted-old-model" } },
               },
-              state: SessionMessage.ToolStateCompleted.make({
+              state: new SessionMessage.ToolStateCompleted({
                 status: "completed",
                 input: { query: "Effect" },
                 content: [],
@@ -432,7 +327,7 @@ Recent work
               }),
               time: { created, completed: created },
             }),
-            SessionMessage.AssistantTool.make({
+            new SessionMessage.AssistantTool({
               type: "tool",
               id: "local-old-model",
               name: "read",
@@ -441,7 +336,7 @@ Recent work
                 metadata: { fake: { call: "old" } },
                 resultMetadata: { fake: { result: "old" } },
               },
-              state: SessionMessage.ToolStateCompleted.make({
+              state: new SessionMessage.ToolStateCompleted({
                 status: "completed",
                 input: { path: "README.md" },
                 content: [],

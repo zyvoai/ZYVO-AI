@@ -1,7 +1,5 @@
 [data-component="diff-changes"] {
   display: flex;
-  direction: ltr;
-  unicode-bidi: isolate;
   gap: 8px;
   justify-content: flex-end;
   align-items: center;
@@ -17,10 +15,10 @@
   }
 
   [data-slot="diff-changes-additions"] {
-    color: var(--v2-state-fg-success);
+    color: var(--state-fg-success);
   }
 
   [data-slot="diff-changes-deletions"] {
-    color: var(--v2-state-fg-danger);
+    color: var(--state-fg-danger);
   }
 }

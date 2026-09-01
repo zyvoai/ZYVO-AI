@@ -1,8 +1,7 @@
 export * as SessionV2 from "./session"
 export * from "./session/schema"
 
-import { DateTime, Effect, Layer, Schema, Context, Stream } from "effect"
-import { ListAnchor } from "@opencode-ai/schema/session"
+import { Cause, DateTime, Effect, Layer, Schema, Context, Stream } from "effect"
 import { and, asc, desc, eq, gt, like, lt, or, type SQL } from "drizzle-orm"
 import { ProjectV2 } from "./project"
 import { WorkspaceV2 } from "./workspace"
@@ -10,7 +9,6 @@ import { ModelV2 } from "./model"
 import { Location } from "./location"
 import { SessionMessage } from "./session/message"
 import { Prompt } from "./session/prompt"
-import { PromptInput } from "@opencode-ai/schema/prompt-input"
 import { EventV2 } from "./event"
 import { Database } from "./database/database"
 import { SessionProjector } from "./session/projector"
@@ -27,19 +25,10 @@ import { fromRow } from "./session/info"
 import { SessionRunner } from "./session/runner/index"
 import { SessionStore } from "./session/store"
 import { SessionExecution } from "./session/execution"
-import { makeGlobalNode } from "./effect/app-node"
-import { LocationServiceMap } from "./location-service-map"
+import { logFailure } from "./session/logging"
 import { MessageDecodeError } from "./session/error"
 import { SessionEvent } from "./session/event"
 import { SessionInput } from "./session/input"
-import { Snapshot } from "./snapshot"
-import { SessionRevert } from "./session/revert"
-import { Revert } from "@opencode-ai/schema/revert"
-import { FSUtil } from "./fs-util"
-import { SessionDurable } from "@opencode-ai/schema/durable-event-manifest"
-
-export const RevertState = Revert.State
-export type RevertState = Revert.State
 
 // get project -> project.locations
 //
@@ -50,7 +39,12 @@ export type RevertState = Revert.State
 //   - by subpath
 // - by workspace (home is special)
 
-export { ListAnchor }
+export const ListAnchor = Schema.Struct({
+  id: SessionSchema.ID,
+  time: Schema.Finite,
+  direction: Schema.Literals(["previous", "next"]),
+})
+export type ListAnchor = typeof ListAnchor.Type
 
 const ListInputBase = {
   workspaceID: WorkspaceV2.ID.pipe(Schema.optional),
@@ -105,8 +99,6 @@ export class PromptConflictError extends Schema.TaggedErrorClass<PromptConflictE
   sessionID: SessionSchema.ID,
   messageID: SessionMessage.ID,
 }) {}
-export const MessageNotFoundError = SessionRevert.MessageNotFoundError
-export type MessageNotFoundError = SessionRevert.MessageNotFoundError
 
 export type Error = NotFoundError | MessageDecodeError | OperationUnavailableError | PromptConflictError
 
@@ -132,14 +124,12 @@ export interface Interface {
   ) => Effect.Effect<SessionMessage.Message[], NotFoundError | MessageDecodeError>
   readonly events: (input: {
     sessionID: SessionSchema.ID
-    after?: number
-  }) => Stream.Stream<SessionEvent.DurableEvent, NotFoundError>
-  readonly history: (input: {
+    after?: EventV2.Cursor
+  }) => Stream.Stream<EventV2.CursorEvent<SessionEvent.DurableEvent>, NotFoundError>
+  readonly switchAgent: (input: {
     sessionID: SessionSchema.ID
-    after?: number
-    limit: number
-  }) => Effect.Effect<{ events: ReadonlyArray<SessionEvent.DurableEvent>; hasMore: boolean }, NotFoundError>
-  readonly switchAgent: (input: { sessionID: SessionSchema.ID; agent: string }) => Effect.Effect<void, NotFoundError>
+    agent: string
+  }) => Effect.Effect<void, OperationUnavailableError>
   readonly switchModel: (input: {
     sessionID: SessionSchema.ID
     model: ModelV2.Ref
@@ -147,7 +137,7 @@ export interface Interface {
   readonly prompt: (input: {
     id?: SessionMessage.ID
     sessionID: SessionSchema.ID
-    prompt: PromptInput.Prompt
+    prompt: Prompt
     delivery?: SessionInput.Delivery
     resume?: boolean
   }) => Effect.Effect<SessionInput.Admitted, NotFoundError | PromptConflictError>
@@ -165,34 +155,36 @@ export interface Interface {
   }) => Effect.Effect<void, OperationUnavailableError>
   readonly compact: (input: CompactInput) => Effect.Effect<void, NotFoundError | OperationUnavailableError>
   readonly wait: (id: SessionSchema.ID) => Effect.Effect<void, NotFoundError | OperationUnavailableError>
-  readonly active: Effect.Effect<ReadonlySet<SessionSchema.ID>>
   readonly resume: (sessionID: SessionSchema.ID) => Effect.Effect<void, NotFoundError | SessionRunner.RunError>
   readonly interrupt: (sessionID: SessionSchema.ID) => Effect.Effect<void>
-  readonly revert: {
-    readonly stage: (input: {
-      sessionID: SessionSchema.ID
-      messageID: SessionMessage.ID
-      files?: boolean
-    }) => Effect.Effect<Revert.State, NotFoundError | MessageNotFoundError | Snapshot.Error>
-    readonly clear: (sessionID: SessionSchema.ID) => Effect.Effect<void, NotFoundError | Snapshot.Error>
-    readonly commit: (sessionID: SessionSchema.ID) => Effect.Effect<void, NotFoundError>
-  }
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/v2/Session") {}
 
-const layer = Layer.effect(
+export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
-    const database = yield* Database.Service
-    const db = database.db
+    const db = (yield* Database.Service).db
     const events = yield* EventV2.Service
     const projects = yield* ProjectV2.Service
     const execution = yield* SessionExecution.Service
     const store = yield* SessionStore.Service
-    const locations = yield* LocationServiceMap.Service
     const decodeMessage = Schema.decodeUnknownEffect(SessionMessage.Message)
     const isDurableSessionEvent = Schema.is(SessionEvent.Durable)
+    const scope = yield* Effect.scope
+
+    const enqueueWake = (admitted: SessionInput.Admitted) =>
+      execution.wake(admitted.sessionID, admitted.admittedSeq).pipe(
+        Effect.tapCause((cause) =>
+          Cause.hasInterruptsOnly(cause)
+            ? Effect.void
+            : logFailure("Failed to wake Session", admitted.sessionID, cause),
+        ),
+        Effect.ignore,
+        Effect.forkIn(scope, { startImmediately: true }),
+        Effect.asVoid,
+      )
+
     const decode = (row: typeof SessionMessageTable.$inferSelect) =>
       decodeMessage({ ...row.data, id: row.id, type: row.type }).pipe(
         Effect.mapError(
@@ -347,28 +339,27 @@ const layer = Layer.effect(
         Stream.unwrap(
           result
             .get(input.sessionID)
-            .pipe(Effect.as(events.durable({ aggregateID: input.sessionID, after: input.after }))),
-        ).pipe(Stream.filter((event): event is SessionEvent.DurableEvent => isDurableSessionEvent(event))),
-      history: Effect.fn("V2Session.history")(function* (input) {
-        yield* result.get(input.sessionID)
-        return yield* EventV2.readAggregate(db, {
-          ...input,
-          aggregateID: input.sessionID,
-          manifest: SessionDurable,
-        })
-      }),
+            .pipe(Effect.as(events.aggregateEvents({ aggregateID: input.sessionID, after: input.after }))),
+        ).pipe(
+          Stream.filter((event): event is EventV2.CursorEvent<SessionEvent.DurableEvent> =>
+            isDurableSessionEvent(event.event),
+          ),
+        ),
       prompt: Effect.fn("V2Session.prompt")((input) =>
         Effect.uninterruptible(
           Effect.gen(function* () {
             yield* result.get(input.sessionID)
-            const prompt = resolvePrompt(input.prompt)
+            const returnPrompt = Effect.fnUntraced(function* (admitted: SessionInput.Admitted) {
+              if (input.resume !== false) yield* enqueueWake(admitted)
+              return admitted
+            }, Effect.uninterruptible)
             const messageID = input.id ?? SessionMessage.ID.create()
             const delivery = input.delivery ?? "steer"
-            const expected = { sessionID: input.sessionID, messageID, prompt, delivery }
+            const expected = { sessionID: input.sessionID, messageID, prompt: input.prompt, delivery }
             const admitted = yield* SessionInput.admit(db, events, {
               id: messageID,
               sessionID: input.sessionID,
-              prompt,
+              prompt: input.prompt,
               delivery,
             }).pipe(
               Effect.catchDefect((defect) =>
@@ -379,8 +370,7 @@ const layer = Layer.effect(
             )
             if (!SessionInput.equivalent(admitted, expected))
               return yield* new PromptConflictError({ sessionID: input.sessionID, messageID })
-            if (input.resume !== false) yield* execution.wake(admitted.sessionID)
-            return admitted
+            return yield* returnPrompt(admitted)
           }),
         ),
       ),
@@ -390,23 +380,11 @@ const layer = Layer.effect(
       skill: Effect.fn("V2Session.skill")(function* () {
         return yield* new OperationUnavailableError({ operation: "skill" })
       }),
-      switchAgent: Effect.fn("V2Session.switchAgent")(function* (input) {
-        yield* result.get(input.sessionID)
-        yield* events.publish(SessionEvent.AgentSwitched, {
-          sessionID: input.sessionID,
-          messageID: SessionMessage.ID.create(),
-          timestamp: yield* DateTime.now,
-          agent: input.agent,
-        })
+      switchAgent: Effect.fn("V2Session.switchAgent")(function* () {
+        return yield* new OperationUnavailableError({ operation: "switchAgent" })
       }),
       switchModel: Effect.fn("V2Session.switchModel")(function* (input) {
-        const session = yield* result.get(input.sessionID)
-        if (
-          session.model?.providerID === input.model.providerID &&
-          session.model.id === input.model.id &&
-          (session.model.variant ?? "default") === (input.model.variant ?? "default")
-        )
-          return
+        yield* result.get(input.sessionID)
         yield* events.publish(SessionEvent.ModelSwitched, {
           sessionID: input.sessionID,
           messageID: SessionMessage.ID.create(),
@@ -422,65 +400,37 @@ const layer = Layer.effect(
         yield* result.get(sessionID)
         return yield* new OperationUnavailableError({ operation: "wait" })
       }),
-      active: execution.active,
       resume: Effect.fn("V2Session.resume")(function* (sessionID) {
         yield* result.get(sessionID)
         yield* execution.resume(sessionID)
       }),
       interrupt: Effect.fn("V2Session.interrupt")((sessionID) =>
-        Effect.uninterruptible(execution.interrupt(sessionID)),
+        Effect.uninterruptible(
+          Effect.gen(function* () {
+            const session = yield* store.get(sessionID)
+            if (!session) return yield* execution.interrupt(sessionID)
+            const event = yield* events.publish(SessionEvent.InterruptRequested, {
+              sessionID,
+              timestamp: yield* DateTime.now,
+            })
+            if (event.seq === undefined)
+              return yield* Effect.die("Interrupt request event is missing aggregate sequence")
+            yield* execution.interrupt(sessionID, event.seq)
+          }),
+        ),
       ),
-      revert: {
-        stage: Effect.fn("V2Session.revert.stage")(function* (input) {
-          const session = yield* result.get(input.sessionID)
-          return yield* SessionRevert.stage({ session, messageID: input.messageID, files: input.files }).pipe(
-            Effect.provideService(Database.Service, database),
-            Effect.provideService(EventV2.Service, events),
-            Effect.provide(locations.get(session.location)),
-          )
-        }),
-        clear: Effect.fn("V2Session.revert.clear")(function* (sessionID) {
-          const session = yield* result.get(sessionID)
-          yield* SessionRevert.clear(session).pipe(
-            Effect.provideService(EventV2.Service, events),
-            Effect.provide(locations.get(session.location)),
-          )
-        }),
-        commit: Effect.fn("V2Session.revert.commit")(function* (sessionID) {
-          const session = yield* result.get(sessionID)
-          yield* SessionRevert.commit(session).pipe(Effect.provideService(EventV2.Service, events))
-        }),
-      },
     })
 
     return result
   }),
 )
 
-const resolvePrompt = (input: PromptInput.Prompt) =>
-  Prompt.make({
-    text: input.text,
-    agents: input.agents,
-    files: input.files?.map((file) => {
-      const dataMime = file.uri.match(/^data:([^;,]+)[;,]/i)?.[1]
-      const target = URL.canParse(file.uri) ? new URL(file.uri).pathname : (file.name ?? file.uri)
-      return {
-        ...file,
-        mime: dataMime ?? (target.endsWith("/") ? "application/x-directory" : FSUtil.mimeType(target)),
-      }
-    }),
-  })
-
-export const node = makeGlobalNode({
-  service: Service,
-  layer: layer.pipe(Layer.orDie),
-  deps: [
-    Database.node,
-    EventV2.node,
-    ProjectV2.node,
-    SessionExecution.node,
-    SessionStore.node,
-    LocationServiceMap.node,
-    SessionProjector.node,
-  ],
-})
+export const defaultLayer = layer.pipe(
+  Layer.provide(SessionExecution.noopLayer),
+  Layer.provide(SessionStore.defaultLayer),
+  Layer.provide(SessionProjector.defaultLayer),
+  Layer.provide(EventV2.defaultLayer),
+  Layer.provide(Database.defaultLayer),
+  Layer.provide(ProjectV2.defaultLayer),
+  Layer.orDie,
+)

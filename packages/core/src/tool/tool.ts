@@ -37,19 +37,10 @@ export type Content =
   | { readonly type: "text"; readonly text: string }
   | { readonly type: "file"; readonly data: string; readonly mime: string; readonly name?: string }
 
-type Config<
-  Input extends SchemaType<any>,
-  Output extends SchemaType<any>,
-  Structured extends SchemaType<any> = Output,
-> = {
+type Config<Input extends SchemaType<any>, Output extends SchemaType<any>> = {
   readonly description: string
   readonly input: Input
   readonly output: Output
-  readonly structured?: Structured
-  readonly toStructuredOutput?: (input: {
-    readonly input: Schema.Schema.Type<Input>
-    readonly output: Output["Encoded"]
-  }) => Schema.Schema.Type<Structured>
   readonly execute: (
     input: Schema.Schema.Type<Input>,
     context: Context,
@@ -68,12 +59,10 @@ type Runtime = {
 
 const runtimes = new WeakMap<AnyTool, Runtime>()
 
-export function make<
-  Input extends SchemaType<any>,
-  Output extends SchemaType<any>,
-  Structured extends SchemaType<any> = Output,
->(config: Config<Input, Output, Structured>): Definition<Input, Structured> {
-  const tool = Object.freeze({}) as Definition<Input, Structured>
+export function make<Input extends SchemaType<any>, Output extends SchemaType<any>>(
+  config: Config<Input, Output>,
+): Definition<Input, Output> {
+  const tool = Object.freeze({}) as Definition<Input, Output>
   const definitions = new Map<string, ToolDefinition>()
   runtimes.set(tool, {
     definition: (name) => {
@@ -83,7 +72,7 @@ export function make<
         name,
         description: config.description,
         inputSchema: toJsonSchema(config.input),
-        outputSchema: toJsonSchema(config.structured ?? config.output),
+        outputSchema: toJsonSchema(config.output),
       })
       definitions.set(name, definition)
       return definition
@@ -95,13 +84,6 @@ export function make<
           config.execute(input, context).pipe(
             Effect.flatMap((output) =>
               Schema.encodeEffect(config.output)(output).pipe(
-                Effect.flatMap((output) => {
-                  if (!config.structured || !config.toStructuredOutput)
-                    return Effect.succeed({ output, structured: output })
-                  return Schema.encodeEffect(config.structured)(config.toStructuredOutput({ input, output })).pipe(
-                    Effect.map((structured) => ({ output, structured })),
-                  )
-                }),
                 Effect.mapError(
                   (error) =>
                     new ToolFailure({
@@ -110,8 +92,8 @@ export function make<
                 ),
               ),
             ),
-            Effect.map(({ output, structured }) => ({
-              structured,
+            Effect.map((output) => ({
+              structured: output,
               content:
                 config.toModelOutput?.({ input, output }).map((part) =>
                   part.type === "text"

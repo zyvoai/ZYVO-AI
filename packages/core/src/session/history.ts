@@ -10,9 +10,9 @@ type DatabaseService = Database.Interface["db"]
 
 const decode = Schema.decodeUnknownEffect(SessionMessage.Message)
 
-export const latestCompaction = Effect.fnUntraced(function* (db: DatabaseService, sessionID: SessionSchema.ID) {
+const latestCompaction = Effect.fnUntraced(function* (db: DatabaseService, sessionID: SessionSchema.ID) {
   return yield* db
-    .select({ seq: SessionMessageTable.seq })
+    .select()
     .from(SessionMessageTable)
     .where(and(eq(SessionMessageTable.session_id, sessionID), eq(SessionMessageTable.type, "compaction")))
     .orderBy(desc(SessionMessageTable.seq))

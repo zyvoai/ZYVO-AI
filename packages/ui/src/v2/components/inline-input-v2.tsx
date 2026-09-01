@@ -1,6 +1,5 @@
 import { type ComponentProps, type JSX, Show, splitProps } from "solid-js"
 import { Icon } from "./icon"
-import { useI18n } from "../../context/i18n"
 import "./inline-input-v2.css"
 
 export interface InlineInputV2Props extends Omit<ComponentProps<"input">, "type" | "prefix"> {
@@ -23,7 +22,6 @@ export interface InlineInputV2Props extends Omit<ComponentProps<"input">, "type"
 }
 
 export function InlineInputV2(props: InlineInputV2Props) {
-  const i18n = useI18n()
   const [local, inputProps] = splitProps(props, [
     "class",
     "classList",
@@ -38,8 +36,6 @@ export function InlineInputV2(props: InlineInputV2Props) {
     "disabled",
     "style",
   ])
-
-  let input: HTMLInputElement | undefined
 
   return (
     <div
@@ -63,15 +59,7 @@ export function InlineInputV2(props: InlineInputV2Props) {
           : {}),
       }}
     >
-      <div
-        data-slot="inline-input-v2-prefix"
-        onMouseDown={(event) => {
-          if (local.disabled || event.button !== 0) return
-          // Keep focus on the input without using a native <label>, so external labels still work.
-          event.preventDefault()
-          input?.focus()
-        }}
-      >
+      <div data-slot="inline-input-v2-prefix">
         <span data-slot="inline-input-v2-prefix-text">{local.prefix}</span>
       </div>
       <div data-slot="inline-input-v2-divider" aria-hidden="true" />
@@ -79,11 +67,6 @@ export function InlineInputV2(props: InlineInputV2Props) {
         <div data-slot="inline-input-v2-value">
           <input
             {...inputProps}
-            ref={(el) => {
-              input = el
-              const ref = inputProps.ref
-              if (typeof ref === "function") ref(el)
-            }}
             type={inputProps.type ?? "text"}
             disabled={local.disabled}
             aria-invalid={local.invalid ? true : undefined}
@@ -94,7 +77,7 @@ export function InlineInputV2(props: InlineInputV2Props) {
           <button
             type="button"
             data-slot="inline-input-v2-icon-button"
-            aria-label={local.copyLabel ?? i18n.t("ui.message.copy")}
+            aria-label={local.copyLabel ?? "Copy"}
             disabled={local.disabled}
             onClick={local.onCopyClick}
           >

@@ -1,41 +1,57 @@
 export * as Catalog from "./catalog"
 
-import { makeLocationNode } from "./effect/app-node"
-import { Array, Context, Effect, Layer, Option, Order, pipe, Schema } from "effect"
-import { Catalog } from "@opencode-ai/schema/catalog"
+import { Array, Context, Effect, Layer, Option, Order, pipe, Schema, Scope, Stream } from "effect"
+import { castDraft, enableMapSet, type Draft } from "immer"
 import { ModelV2 } from "./model"
+import { ModelRequest } from "./model-request"
+import { PluginV2 } from "./plugin"
 import { ProviderV2 } from "./provider"
+import { Location } from "./location"
 import { EventV2 } from "./event"
 import { Policy } from "./policy"
 import { State } from "./state"
 import { Integration } from "./integration"
 
 export type ProviderRecord = {
-  provider: ProviderV2.MutableInfo
-  models: Map<ModelV2.ID, ModelV2.MutableInfo>
+  provider: ProviderV2.Info
+  models: Map<ModelV2.ID, ModelV2.Info>
 }
 
 export type DefaultModel = { providerID: ProviderV2.ID; modelID: ModelV2.ID }
 
+export class ProviderNotFoundError extends Schema.TaggedErrorClass<ProviderNotFoundError>()(
+  "CatalogV2.ProviderNotFound",
+  {
+    providerID: ProviderV2.ID,
+  },
+) {}
+
+export class ModelNotFoundError extends Schema.TaggedErrorClass<ModelNotFoundError>()("CatalogV2.ModelNotFound", {
+  providerID: ProviderV2.ID,
+  modelID: ModelV2.ID,
+}) {}
+
 export const PolicyActions = Schema.Literals(["provider.use"])
 
-export const Event = Catalog.Event
+export const Event = {
+  Updated: EventV2.define({ type: "catalog.updated", schema: {} }),
+}
 
 type Data = {
   providers: Map<ProviderV2.ID, ProviderRecord>
   defaultModel?: DefaultModel
 }
 
-export type Draft = {
+export type Editor = {
   provider: {
     list: () => readonly ProviderRecord[]
     get: (providerID: ProviderV2.ID) => ProviderRecord | undefined
-    update: (providerID: ProviderV2.ID, fn: (provider: ProviderV2.MutableInfo) => void) => void
+    update: (providerID: ProviderV2.ID, fn: (provider: Draft<ProviderV2.Info>) => void) => void
     remove: (providerID: ProviderV2.ID) => void
   }
   model: {
     get: (providerID: ProviderV2.ID, modelID: ModelV2.ID) => ModelV2.Info | undefined
-    update: (providerID: ProviderV2.ID, modelID: ModelV2.ID, fn: (model: ModelV2.MutableInfo) => void) => void
+    update: (providerID: ProviderV2.ID, modelID: ModelV2.ID, fn: (model: Draft<ModelV2.Info>) => void) => void
     remove: (providerID: ProviderV2.ID, modelID: ModelV2.ID) => void
     default: {
       get: () => DefaultModel | undefined
@@ -44,35 +60,44 @@ export type Draft = {
   }
 }
 
-export interface Interface extends State.Transformable<Draft> {
+export interface Interface {
+  readonly transform: State.Interface<Data, Editor>["transform"]
   readonly provider: {
-    readonly get: (providerID: ProviderV2.ID) => Effect.Effect<ProviderV2.Info | undefined>
+    readonly get: (providerID: ProviderV2.ID) => Effect.Effect<ProviderV2.Info, ProviderNotFoundError>
     readonly all: () => Effect.Effect<ProviderV2.Info[]>
     readonly available: () => Effect.Effect<ProviderV2.Info[]>
   }
   readonly model: {
-    readonly get: (providerID: ProviderV2.ID, modelID: ModelV2.ID) => Effect.Effect<ModelV2.Info | undefined>
+    readonly get: (
+      providerID: ProviderV2.ID,
+      modelID: ModelV2.ID,
+    ) => Effect.Effect<ModelV2.Info, ProviderNotFoundError | ModelNotFoundError>
     readonly all: () => Effect.Effect<ModelV2.Info[]>
     readonly available: () => Effect.Effect<ModelV2.Info[]>
-    readonly default: () => Effect.Effect<ModelV2.Info | undefined>
-    readonly small: (providerID: ProviderV2.ID) => Effect.Effect<ModelV2.Info | undefined>
+    readonly default: () => Effect.Effect<Option.Option<ModelV2.Info>>
+    readonly small: (providerID: ProviderV2.ID) => Effect.Effect<Option.Option<ModelV2.Info>>
   }
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/v2/Catalog") {}
 
-const layer = Layer.effect(
+enableMapSet()
+
+export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
+    const location = yield* Location.Service
+    const plugin = yield* PluginV2.Service
     const events = yield* EventV2.Service
     const policy = yield* Policy.Service
     const integrations = yield* Integration.Service
+    const scope = yield* Scope.Scope
 
-    const available = (provider: ProviderV2.Info, integration: Integration.Info | undefined) => {
+    const available = (provider: ProviderV2.Info, integration: Integration.Info | undefined, connected: boolean) => {
       if (provider.disabled) return false
       if (typeof provider.request.body.apiKey === "string") return true
-      if (integration?.connections.length) return true
-      return provider.integrationID === undefined && !integration
+      if (connected) return true
+      return !integration
     }
 
     const projectModel = (model: ModelV2.Info, provider: ProviderV2.Info) => {
@@ -85,37 +110,42 @@ const layer = Layer.effect(
               ? { ...model.api, settings: { ...provider.api.settings, ...model.api.settings } }
               : model.api
       const request = {
-        headers: { ...provider.request.headers, ...model.request.headers },
-        body: { ...provider.request.body, ...model.request.body },
+        ...ModelRequest.merge({ ...provider.request, generation: {}, options: {} }, model.request),
         variant: model.request.variant,
       }
-      return ModelV2.Info.make({
+      return new ModelV2.Info({
         ...model,
         api,
         request,
       })
     }
 
-    const normalizeApi = (item: ProviderV2.MutableInfo | ModelV2.MutableInfo) => {
+    function* getRecord(providerID: ProviderV2.ID) {
+      const match = state.get().providers.get(providerID)
+      if (!match) return yield* new ProviderNotFoundError({ providerID })
+      return match
+    }
+
+    const normalizeApi = (item: Draft<ProviderV2.Info> | Draft<ModelV2.Info>) => {
       if (typeof item.request.body.baseURL !== "string") return
       item.api.url = item.request.body.baseURL
       delete item.request.body.baseURL
     }
 
-    const state = State.create<Data, Draft>({
+    const state = State.create<Data, Editor>({
       initial: () => ({ providers: new Map() }),
-      draft: (draft) => {
-        const result: Draft = {
+      editor: (draft) => {
+        const result: Editor = {
           provider: {
             list: () => Array.fromIterable(draft.providers.values()) as ProviderRecord[],
             get: (providerID) => draft.providers.get(providerID),
             update: (providerID, fn) => {
               let current = draft.providers.get(providerID)
               if (!current) {
-                current = {
-                  provider: ProviderV2.Info.empty(providerID) as ProviderV2.MutableInfo,
-                  models: new Map<ModelV2.ID, ModelV2.MutableInfo>(),
-                }
+                current = castDraft({
+                  provider: ProviderV2.Info.empty(providerID),
+                  models: new Map<ModelV2.ID, ModelV2.Info>(),
+                })
                 draft.providers.set(providerID, current)
               }
               fn(current.provider)
@@ -130,14 +160,13 @@ const layer = Layer.effect(
             update: (providerID, modelID, fn) => {
               let record = draft.providers.get(providerID)
               if (!record) {
-                record = {
-                  provider: ProviderV2.Info.empty(providerID) as ProviderV2.MutableInfo,
-                  models: new Map<ModelV2.ID, ModelV2.MutableInfo>(),
-                }
+                record = castDraft({
+                  provider: ProviderV2.Info.empty(providerID),
+                  models: new Map<ModelV2.ID, ModelV2.Info>(),
+                })
                 draft.providers.set(providerID, record)
               }
-              const model =
-                record.models.get(modelID) ?? (ModelV2.Info.empty(providerID, modelID) as ModelV2.MutableInfo)
+              const model = record.models.get(modelID) ?? castDraft(ModelV2.Info.empty(providerID, modelID))
               if (!record.models.has(modelID)) record.models.set(modelID, model)
               fn(model)
               model.id = modelID
@@ -157,7 +186,8 @@ const layer = Layer.effect(
         }
         return result
       },
-      finalize: Effect.fn("CatalogV2.finalize")(function* (catalog) {
+      finalize: Effect.fn("CatalogV2.finalize")(function* (catalog, reason) {
+        if (reason !== "plugin.added") yield* plugin.trigger("catalog.transform", catalog, {}).pipe(Effect.asVoid)
         if (policy.hasStatements()) {
           for (const record of [...catalog.provider.list()]) {
             if ((yield* policy.evaluate("provider.use", record.provider.id, "allow")) === "deny") {
@@ -168,13 +198,25 @@ const layer = Layer.effect(
         yield* events.publish(Event.Updated, {})
       }),
     })
+    yield* events.subscribe(PluginV2.Event.Added).pipe(
+      // Plugin registries are location scoped even though the event bus is process scoped.
+      Stream.filter(
+        (event) =>
+          event.location?.directory === location.directory && event.location.workspaceID === location.workspaceID,
+      ),
+      Stream.runForEach((event) =>
+        state.mutate((catalog) => plugin.triggerFor(event.data.id, "catalog.transform", catalog, {}), "plugin.added"),
+      ),
+      Effect.forkIn(scope, { startImmediately: true }),
+    )
+
     const result: Interface = {
       transform: state.transform,
-      reload: state.reload,
 
       provider: {
         get: Effect.fn("CatalogV2.provider.get")(function* (providerID) {
-          return state.get().providers.get(providerID)?.provider
+          const record = yield* getRecord(providerID)
+          return record.provider
         }),
 
         all: Effect.fn("CatalogV2.provider.all")(function* () {
@@ -183,18 +225,23 @@ const layer = Layer.effect(
 
         available: Effect.fn("CatalogV2.provider.available")(function* () {
           const active = new Map((yield* integrations.list()).map((integration) => [integration.id, integration]))
+          const connections = yield* integrations.connection.list()
           return (yield* result.provider.all()).filter((provider) =>
-            available(provider, active.get(provider.integrationID ?? Integration.ID.make(provider.id))),
+            available(
+              provider,
+              active.get(Integration.ID.make(provider.id)),
+              connections.has(Integration.ID.make(provider.id)),
+            ),
           )
         }),
       },
 
       model: {
         get: Effect.fn("CatalogV2.model.get")(function* (providerID, modelID) {
-          const record = state.get().providers.get(providerID)
-          if (!record) return
+          const record = yield* getRecord(providerID)
           const model = record.models.get(modelID)
-          return model && projectModel(model, record.provider)
+          if (!model) return yield* new ModelNotFoundError({ providerID, modelID })
+          return projectModel(model, record.provider)
         }),
 
         all: Effect.fn("CatalogV2.model.all")(function* () {
@@ -203,7 +250,7 @@ const layer = Layer.effect(
             Array.flatMap((record) => {
               return Array.fromIterable(record.models.values()).map((model) => projectModel(model, record.provider))
             }),
-            Array.sortWith((item) => item.time.released, Order.flip(Order.Number)),
+            Array.sortWith((item) => item.time.released.epochMilliseconds, Order.flip(Order.Number)),
           )
         }),
 
@@ -215,35 +262,31 @@ const layer = Layer.effect(
         default: Effect.fn("CatalogV2.model.default")(function* () {
           const defaultModel = state.get().defaultModel
           if (defaultModel) {
-            const provider = yield* result.provider.get(defaultModel.providerID)
-            if (provider && (yield* result.provider.available()).some((item) => item.id === provider.id)) {
-              const model = yield* result.model.get(defaultModel.providerID, defaultModel.modelID)
-              if (model?.enabled) return model
+            const provider = yield* result.provider.get(defaultModel.providerID).pipe(Effect.option)
+            if (
+              Option.isSome(provider) &&
+              (yield* result.provider.available()).some((item) => item.id === provider.value.id)
+            ) {
+              const model = yield* result.model.get(defaultModel.providerID, defaultModel.modelID).pipe(Effect.option)
+              if (Option.isSome(model) && model.value.enabled) return model
             }
           }
 
-          return Option.getOrUndefined(
-            pipe(
-              yield* result.model.available(),
-              Array.sortWith((item) => item.time.released, Order.flip(Order.Number)),
-              Array.head,
-            ),
+          return pipe(
+            yield* result.model.available(),
+            Array.sortWith((item) => item.time.released.epochMilliseconds, Order.flip(Order.Number)),
+            Array.head,
           )
         }),
 
         small: Effect.fn("CatalogV2.model.small")(function* (providerID) {
           const record = state.get().providers.get(providerID)
-          if (!record) return
+          if (!record) return Option.none<ModelV2.Info>()
           const provider = record.provider
-
-          // TODO: Remove these provider-specific assumptions once model syncing reliably reports available deployments.
-          if (providerID === ProviderV2.ID.azure || providerID === ProviderV2.ID.make("azure-cognitive-services")) {
-            return
-          }
 
           if (providerID === ProviderV2.ID.opencode) {
             const gpt5Nano = record.models.get(ModelV2.ID.make("gpt-5-nano"))
-            if (gpt5Nano?.enabled && gpt5Nano.status === "active") return projectModel(gpt5Nano, provider)
+            if (gpt5Nano?.enabled && gpt5Nano.status === "active") return Option.some(projectModel(gpt5Nano, provider))
           }
 
           const candidates = pipe(
@@ -259,7 +302,7 @@ const layer = Layer.effect(
             Array.map((model) => ({
               model,
               cost: model.cost[0] ? model.cost[0].input + model.cost[0].output : 999,
-              age: (Date.now() - model.time.released) / (1000 * 60 * 60 * 24 * 30),
+              age: (Date.now() - model.time.released.epochMilliseconds) / (1000 * 60 * 60 * 24 * 30),
               small: SMALL_MODEL_RE.test(`${model.id} ${model.family ?? ""} ${model.name}`.toLowerCase()),
             })),
             Array.filter((item) => item.cost > 0 && item.age <= 18),
@@ -276,12 +319,10 @@ const layer = Layer.effect(
             )
           }
 
-          return Option.getOrUndefined(
-            pipe(
-              candidates,
-              Array.filter((item) => item.small),
-              (items) => (items.length > 0 ? pick(items) : pick(candidates)),
-            ),
+          return pipe(
+            candidates,
+            Array.filter((item) => item.small),
+            (items) => (items.length > 0 ? pick(items) : pick(candidates)),
           )
         }),
       },
@@ -295,7 +336,6 @@ const SMALL_MODEL_RE = /\b(nano|flash|lite|mini|haiku|small|fast)\b/
 
 export const locationLayer = layer.pipe(
   Layer.provideMerge(Integration.locationLayer),
+  Layer.provideMerge(PluginV2.locationLayer),
   Layer.provideMerge(Policy.locationLayer),
 )
-
-export const node = makeLocationNode({ service: Service, layer, deps: [EventV2.node, Policy.node, Integration.node] })

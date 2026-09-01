@@ -1,3 +1,10 @@
-export * as V2Schema from "./v2-schema"
+import { DateTime, Schema, SchemaGetter } from "effect"
 
-export { DateTimeUtcFromMillis } from "@opencode-ai/schema/schema"
+export const DateTimeUtcFromMillis = Schema.Finite.pipe(
+  Schema.decodeTo(Schema.DateTimeUtc, {
+    decode: SchemaGetter.transform((value) => DateTime.makeUnsafe(value)),
+    encode: SchemaGetter.transform((value) => DateTime.toEpochMillis(value)),
+  }),
+)
+
+export * as V2Schema from "./v2-schema"

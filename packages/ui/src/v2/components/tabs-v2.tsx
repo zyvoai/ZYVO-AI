@@ -1,7 +1,6 @@
 import { Tabs as Kobalte } from "@kobalte/core/tabs"
 import { Show, splitProps, type JSX } from "solid-js"
 import type { ComponentProps, ParentProps, Component } from "solid-js"
-import { useI18n } from "../../context/i18n"
 import "./tabs-v2.css"
 
 export interface TabsV2Props extends ComponentProps<typeof Kobalte> {
@@ -75,7 +74,7 @@ function TabsV2Trigger(props: ParentProps<TabsV2TriggerProps>) {
           {split.children}
           <Show when={split.subtext}>
             {(subtext) => (
-              <span data-slot="tabs-v2-subtext" class="ms-2 text-xs text-text-weak">
+              <span data-slot="tabs-v2-subtext" class="ml-2 text-xs text-text-weak">
                 {subtext()}
               </span>
             )}
@@ -87,13 +86,12 @@ function TabsV2Trigger(props: ParentProps<TabsV2TriggerProps>) {
 }
 
 function TabsV2CloseButton(props: TabsV2CloseButtonProps) {
-  const i18n = useI18n()
   const [split, rest] = splitProps(props, ["class", "classList", "onClick"])
   return (
     <div
       role="button"
       tabindex={0}
-      aria-label={i18n.t("ui.tabs.close")}
+      aria-label="Close tab"
       data-slot="tabs-v2-close-button"
       {...rest}
       classList={{

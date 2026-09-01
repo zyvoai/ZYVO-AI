@@ -1,8 +1,7 @@
 import { describe, expect, test } from "bun:test"
-import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
-import { SessionProjector } from "@opencode-ai/core/session/projector"
-import { Effect, Option } from "effect"
+import { Database } from "@opencode-ai/core/database/database"
+import { Effect, Layer, Option } from "effect"
 import { Session as SessionNs } from "@/session/session"
 import { MessageV2 } from "../../src/session/message-v2"
 import { MessageID, PartID, type SessionID } from "../../src/session/schema"
@@ -12,7 +11,7 @@ import { testEffect } from "../lib/effect"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
 
-const it = testEffect(LayerNode.compile(LayerNode.group([SessionNs.node, MessageV2.node, SessionProjector.node])))
+const it = testEffect(Layer.mergeAll(SessionNs.defaultLayer, Database.defaultLayer))
 
 const withSession = <A, E, R>(
   fn: (input: { session: SessionNs.Interface; sessionID: SessionID }) => Effect.Effect<A, E, R>,

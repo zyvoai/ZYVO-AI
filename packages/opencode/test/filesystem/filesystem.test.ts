@@ -1,11 +1,12 @@
 import { describe, test, expect } from "bun:test"
-import { LayerNode } from "@opencode-ai/core/effect/layer-node"
-import { Effect } from "effect"
+import { Effect, Layer } from "effect"
+import { NodeFileSystem } from "@effect/platform-node"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { testEffect } from "../lib/effect"
 import path from "path"
 
-const { effect: it } = testEffect(LayerNode.compile(FSUtil.node))
+const live = FSUtil.layer.pipe(Layer.provide(NodeFileSystem.layer))
+const { effect: it } = testEffect(live)
 
 describe("FSUtil", () => {
   describe("isDir", () => {

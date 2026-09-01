@@ -1,14 +1,14 @@
 import os from "os"
 import { InstallationVersion } from "../../installation/version"
 import { Effect } from "effect"
-import { define } from "../internal"
+import { PluginV2 } from "../../plugin"
 import { ProviderV2 } from "../../provider"
 
-export const GitLabPlugin = define({
-  id: "gitlab",
-  effect: Effect.fn(function* (ctx) {
-    yield* ctx.aisdk.sdk(
-      Effect.fn(function* (evt) {
+export const GitLabPlugin = PluginV2.define({
+  id: PluginV2.ID.make("gitlab"),
+  effect: Effect.gen(function* () {
+    return {
+      "aisdk.sdk": Effect.fn(function* (evt) {
         if (evt.package !== "gitlab-ai-provider") return
         const mod = yield* Effect.promise(() => import("gitlab-ai-provider"))
         evt.sdk = mod.createGitLab({
@@ -30,9 +30,7 @@ export const GitLabPlugin = define({
           },
         })
       }),
-    )
-    yield* ctx.aisdk.language(
-      Effect.fn(function* (evt) {
+      "aisdk.language": Effect.fn(function* (evt) {
         if (evt.model.providerID !== ProviderV2.ID.gitlab) return
         const featureFlags =
           typeof evt.options.featureFlags === "object" && evt.options.featureFlags ? evt.options.featureFlags : {}
@@ -60,6 +58,6 @@ export const GitLabPlugin = define({
           featureFlags,
         })
       }),
-    )
+    }
   }),
 })

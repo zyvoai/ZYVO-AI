@@ -435,6 +435,7 @@ describe("run session data", () => {
             title: "",
             metadata: {
               output: "/tmp/demo\n",
+              description: "",
             },
             time: { start: 1, end: 2 },
           },
@@ -489,6 +490,7 @@ describe("run session data", () => {
           title: "",
           metadata: {
             output: "/tmp/demo\n",
+            description: "",
           },
           time: { start: 1, end: 2 },
         },

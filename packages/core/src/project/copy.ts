@@ -5,7 +5,7 @@ import path from "path"
 import { AbsolutePath } from "../schema"
 import { FSUtil } from "../fs-util"
 import { Git } from "../git"
-import { makeLocationNode } from "../effect/app-node"
+import { LayerNode } from "../effect/layer-node"
 import { Project } from "../project"
 import { ProjectDirectories } from "./directories"
 import { makeGitWorktreeStrategy } from "./copy-strategies"
@@ -13,16 +13,25 @@ import { Slug } from "../util/slug"
 import { EventV2 } from "../event"
 import { Database } from "../database/database"
 import { Location } from "../location"
-import { Event } from "@opencode-ai/schema/project-directories"
-import { ProjectCopy } from "@opencode-ai/schema/project-copy"
+import { PluginBoot } from "../plugin/boot"
 
-export const StrategyID = ProjectCopy.StrategyID
+export const StrategyID = Schema.Trim.pipe(Schema.check(Schema.isNonEmpty()), Schema.brand("ProjectCopy.StrategyID"))
 export type StrategyID = typeof StrategyID.Type
 
-export const CreateInput = ProjectCopy.CreateInput
+export const CreateInput = Schema.Struct({
+  projectID: Project.ID,
+  strategy: StrategyID,
+  sourceDirectory: AbsolutePath,
+  directory: AbsolutePath,
+  name: Schema.optional(Schema.String),
+}).annotate({ identifier: "ProjectCopy.CreateInput" })
 export type CreateInput = typeof CreateInput.Type
 
-export const RemoveInput = ProjectCopy.RemoveInput
+export const RemoveInput = Schema.Struct({
+  projectID: Project.ID,
+  directory: AbsolutePath,
+  force: Schema.Boolean,
+}).annotate({ identifier: "ProjectCopy.RemoveInput" })
 export type RemoveInput = typeof RemoveInput.Type
 
 export const RefreshInput = Schema.Struct({
@@ -36,7 +45,9 @@ export const RefreshResult = Schema.Struct({
 }).annotate({ identifier: "ProjectCopy.RefreshResult" })
 export type RefreshResult = typeof RefreshResult.Type
 
-export const Copy = ProjectCopy.Copy
+export const Copy = Schema.Struct({
+  directory: AbsolutePath,
+}).annotate({ identifier: "ProjectCopy.Copy" })
 export type Copy = typeof Copy.Type
 
 export const ListEntry = Schema.Struct({
@@ -96,7 +107,12 @@ export interface Strategy {
   readonly list: (directory: AbsolutePath) => Effect.Effect<ListEntry[], Git.WorktreeError | DirectoryUnavailableError>
 }
 
-export { Event }
+export const Event = {
+  Updated: EventV2.define({
+    type: "project.directories.updated",
+    schema: { projectID: Project.ID },
+  }),
+}
 
 export interface Interface {
   readonly register: (strategy: Strategy) => Effect.Effect<void, DuplicateStrategyError>
@@ -109,8 +125,10 @@ export class Service extends Context.Service<Service, Interface>()("@opencode/Pr
 
 export const refreshAfterBoot = Effect.gen(function* () {
   const location = yield* Location.Service
+  const boot = yield* PluginBoot.Service
   const copies = yield* Service
   yield* Effect.gen(function* () {
+    yield* boot.wait()
     yield* Effect.logInfo("project copy refresh started", { projectID: location.project.id })
     const result = yield* copies.refresh({ projectID: location.project.id })
     yield* Effect.logInfo("project copy refresh done", {
@@ -125,7 +143,7 @@ export const refreshAfterBoot = Effect.gen(function* () {
   )
 })
 
-const layer = Layer.effect(
+export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const fs = yield* FSUtil.Service
@@ -139,7 +157,7 @@ const layer = Layer.effect(
     })
 
     const canonical = Effect.fnUntraced(function* (input: AbsolutePath) {
-      const resolved = AbsolutePath.make(yield* fs.resolve(input))
+      const resolved = AbsolutePath.make(FSUtil.resolve(input))
       if (!(yield* fs.isDir(resolved))) return yield* new DirectoryUnavailableError({ directory: input })
       return resolved
     })
@@ -279,14 +297,4 @@ const layer = Layer.effect(
 )
 
 export const locationLayer = layer
-export const node = makeLocationNode({
-  service: Service,
-  layer: layer,
-  deps: [FSUtil.node, Git.node, ProjectDirectories.node, EventV2.node, Database.node],
-})
-
-export const refreshNode = makeLocationNode({
-  name: "project-copy-refresh",
-  layer: Layer.effectDiscard(refreshAfterBoot),
-  deps: [node, Location.node],
-})
+export const node = LayerNode.make(layer, [FSUtil.node, Git.node, ProjectDirectories.node, EventV2.node, Database.node])

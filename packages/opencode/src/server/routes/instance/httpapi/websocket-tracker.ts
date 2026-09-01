@@ -1,5 +1,4 @@
 import { Context, Effect, Layer, Option } from "effect"
-import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import * as Socket from "effect/unstable/socket/Socket"
 
 export const SERVER_CLOSING_EVENT = () => new Socket.CloseEvent(1001, "server closing")
@@ -14,7 +13,7 @@ export interface Interface {
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/HttpApiWebSocketTracker") {}
 
-const layer = Layer.sync(Service)(() => {
+export const layer = Layer.sync(Service)(() => {
   const sockets = new Set<Close>()
   let closing = false
   return Service.of({
@@ -44,8 +43,6 @@ const layer = Layer.sync(Service)(() => {
     }),
   })
 })
-
-export const node = LayerNode.make({ service: Service, layer, deps: [] })
 
 export const register = (close: Close) =>
   Effect.gen(function* () {

@@ -26,15 +26,11 @@ HOST_BUN="${HOST_BUN:-bun}"
 
 echo "=== Building OpenCode v${OPENCODE_VERSION} for Android aarch64 ==="
 
-# Clone OpenCode if needed
-if [ ! -d "$OPENCODE_SRC/.git" ]; then
-    echo ">>> Cloning OpenCode..."
-    git clone --depth 1 --branch "v${OPENCODE_VERSION}" https://github.com/anomalyco/opencode.git "$OPENCODE_SRC"
-else
-    echo ">>> OpenCode source exists at $OPENCODE_SRC"
-fi
-
+# Build from OUR repo (checked out by CI / this workspace) — no upstream clone.
+# Customizations committed to this repo flow straight into the binary.
+OPENCODE_SRC="$(cd "$REPO_ROOT/.." && pwd)"
 OPENCODE_PKG="$OPENCODE_SRC/packages/opencode"
+echo ">>> Source: $OPENCODE_SRC"
 
 # Install OpenCode dependencies
 echo ">>> Installing OpenCode dependencies..."
@@ -143,7 +139,10 @@ fi
 for f in "$PREBUILT_DIR"/*.so; do
     if [ -f "$f" ]; then cp "$f" "$DIST_DIR/"; fi
 done
-if [ -f "$PREBUILT_DIR/opencode" ]; then cp "$PREBUILT_DIR/opencode" "$DIST_DIR/opencode-wrapper"; fi
+if [ -f "$PREBUILT_DIR/opencode" ]; then
+    # Ship OUR wrapper (guysoft's logic + zyvo env fixes) instead of his copy
+    cp "$REPO_ROOT/wrapper.sh" "$DIST_DIR/opencode-wrapper"
+fi
 if [ -f "$PREBUILT_DIR/opencode.bin" ]; then cp "$PREBUILT_DIR/opencode.bin" "$DIST_DIR/opencode-prebuilt.bin"; fi
 
 # Verify output

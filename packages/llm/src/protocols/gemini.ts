@@ -8,7 +8,6 @@ import {
   LLMEvent,
   Usage,
   type FinishReason,
-  type JsonSchema,
   type LLMRequest,
   type MediaPart,
   type ProviderMetadata,
@@ -20,10 +19,9 @@ import {
 import { JsonObject, optionalArray, ProviderShared } from "./shared"
 import { GeminiToolSchema } from "./utils/gemini-tool-schema"
 import { Lifecycle } from "./utils/lifecycle"
-import { ToolSchemaProjection } from "./utils/tool-schema"
 
 const ADAPTER = "gemini"
-const MEDIA_MIMES = new Set<string>(ProviderShared.MEDIA_MIMES)
+const IMAGE_MIMES = new Set<string>(ProviderShared.IMAGE_MIMES)
 export const DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
 
 // =============================================================================
@@ -168,10 +166,10 @@ interface ParserState {
 // =============================================================================
 // Request Lowering
 // =============================================================================
-const lowerTool = (tool: ToolDefinition, inputSchema: JsonSchema) => ({
+const lowerTool = (tool: ToolDefinition) => ({
   name: tool.name,
   description: tool.description,
-  parameters: GeminiToolSchema.convert(inputSchema),
+  parameters: GeminiToolSchema.convert(tool.inputSchema),
 })
 
 const lowerToolConfig = (toolChoice: NonNullable<LLMRequest["toolChoice"]>) =>
@@ -184,7 +182,7 @@ const lowerToolConfig = (toolChoice: NonNullable<LLMRequest["toolChoice"]>) =>
 
 const lowerUserPart = Effect.fn("Gemini.lowerUserPart")(function* (part: TextPart | MediaPart) {
   if (part.type === "text") return { text: part.text }
-  const media = yield* ProviderShared.validateMedia("Gemini", part, MEDIA_MIMES)
+  const media = yield* ProviderShared.validateMedia("Gemini", part, IMAGE_MIMES)
   return { inlineData: { mimeType: media.mime, data: media.base64 } }
 })
 
@@ -277,7 +275,7 @@ const lowerMessages = Effect.fn("Gemini.lowerMessages")(function* (request: LLMR
       })
       for (const item of content) {
         if (item.type === "text") continue
-        const media = yield* ProviderShared.validateToolFile("Gemini", item, MEDIA_MIMES)
+        const media = yield* ProviderShared.validateToolFile("Gemini", item, IMAGE_MIMES)
         parts.push({ inlineData: { mimeType: media.mime, data: media.base64 } })
       }
     }
@@ -302,7 +300,6 @@ const thinkingConfig = (request: LLMRequest) => {
 const fromRequest = Effect.fn("Gemini.fromRequest")(function* (request: LLMRequest) {
   const toolsEnabled = request.tools.length > 0 && request.toolChoice?.type !== "none"
   const generation = request.generation
-  const toolSchemaCompatibility = request.model.compatibility?.toolSchema
   const generationConfig = {
     maxOutputTokens: generation?.maxTokens,
     temperature: generation?.temperature,
@@ -316,15 +313,7 @@ const fromRequest = Effect.fn("Gemini.fromRequest")(function* (request: LLMReque
     contents: yield* lowerMessages(request),
     systemInstruction:
       request.system.length === 0 ? undefined : { parts: [{ text: ProviderShared.joinText(request.system) }] },
-    tools: toolsEnabled
-      ? [
-          {
-            functionDeclarations: request.tools.map((tool) =>
-              lowerTool(tool, ToolSchemaProjection.modelCompatibility(tool.inputSchema, toolSchemaCompatibility)),
-            ),
-          },
-        ]
-      : undefined,
+    tools: toolsEnabled ? [{ functionDeclarations: request.tools.map(lowerTool) }] : undefined,
     toolConfig: toolsEnabled && request.toolChoice ? yield* lowerToolConfig(request.toolChoice) : undefined,
     generationConfig: Object.values(generationConfig).some((value) => value !== undefined)
       ? generationConfig
@@ -418,35 +407,21 @@ const step = (state: ParserState, event: GeminiEvent) => {
     if ("thoughtSignature" in part && part.thoughtSignature && "thought" in part && part.thought)
       reasoningSignature = part.thoughtSignature
     if ("text" in part && part.text.length > 0) {
-      if (part.thought) {
-        lifecycle = Lifecycle.reasoningDelta(
-          lifecycle,
-          events,
-          "reasoning-0",
-          part.text,
-          part.thoughtSignature ? googleMetadata({ thoughtSignature: part.thoughtSignature }) : undefined,
-        )
-        continue
-      }
-      lifecycle = Lifecycle.reasoningEnd(
-        lifecycle,
-        events,
-        "reasoning-0",
-        reasoningSignature ? googleMetadata({ thoughtSignature: reasoningSignature }) : undefined,
-      )
-      lifecycle = Lifecycle.textDelta(lifecycle, events, "text-0", part.text)
+      lifecycle = part.thought
+        ? Lifecycle.reasoningDelta(
+            lifecycle,
+            events,
+            "reasoning-0",
+            part.text,
+            part.thoughtSignature ? googleMetadata({ thoughtSignature: part.thoughtSignature }) : undefined,
+          )
+        : Lifecycle.textDelta(lifecycle, events, "text-0", part.text)
       continue
     }
 
     if ("functionCall" in part) {
       const input = part.functionCall.args
       const id = `tool_${nextToolCallId++}`
-      lifecycle = Lifecycle.reasoningEnd(
-        lifecycle,
-        events,
-        "reasoning-0",
-        reasoningSignature ? googleMetadata({ thoughtSignature: reasoningSignature }) : undefined,
-      )
       lifecycle = Lifecycle.stepStart(lifecycle, events)
       events.push(
         LLMEvent.toolCall({
