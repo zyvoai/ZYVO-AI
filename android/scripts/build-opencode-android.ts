@@ -309,7 +309,7 @@ const totalView = new DataView(output.buffer, outputSize - 8, 8)
 totalView.setUint32(0, newTotalByteCount & 0xFFFFFFFF, true)
 totalView.setUint32(4, Math.floor(newTotalByteCount / 0x100000000), true)
 
-const androidOutputPath = path.join(OUTPUT_DIR, "opencode")
+const androidOutputPath = path.join(OUTPUT_DIR, "zyvo")
 await Bun.write(androidOutputPath, output)
 fs.chmodSync(androidOutputPath, 0o755)
 
