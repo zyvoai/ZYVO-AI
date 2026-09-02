@@ -84,7 +84,7 @@ license = MIT
 depend = ripgrep
 EOF
 
-PACMAN_NAME="opencode-${OPENCODE_VERSION}-1-aarch64.pkg.tar.xz"
+PACMAN_NAME="zyvo-${OPENCODE_VERSION}-1-aarch64.pkg.tar.xz"
 cd "$PACMAN_STAGING"
 tar cf - .PKGINFO data | xz -9 > "$PKG_DIR/$PACMAN_NAME"
 echo "    Created $PACMAN_NAME"
@@ -113,7 +113,7 @@ Description: AI-powered coding assistant for the terminal
  This package provides a standalone binary compiled for Android/Termux.
 EOF
 
-DEB_NAME="opencode_${OPENCODE_VERSION}_aarch64.deb"
+DEB_NAME="zyvo_${OPENCODE_VERSION}_aarch64.deb"
 cd "$DEB_STAGING/data"
 tar czf "$DEB_STAGING/data.tar.gz" data
 cd "$DEB_STAGING/DEBIAN"
