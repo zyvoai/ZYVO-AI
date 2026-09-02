@@ -3,8 +3,8 @@
 # Zyvo / OpenCode one-click installer for Termux (Android aarch64)
 #
 # Usage (in Termux):
-#   curl -fsSL https://raw.githubusercontent.com/zyvoai/zyvo/main/install.sh | bash
-#   # or: bash install.sh zyvoai/zyvo
+#   curl -fsSL https://raw.githubusercontent.com/zyvoai/ZYVO-AI/main/install.sh | bash
+#   # or: bash install.sh zyvoai/ZYVO-AI
 #
 # Installs the native Android build released by this repo's GitHub Actions
 # workflow. Direct binary — no proot, no glibc layer.
@@ -13,9 +13,9 @@ set -euo pipefail
 
 # ---------------------------------------------------------------
 # Config: repo that hosts the release (owner/name).
-# Override with:  bash install.sh zyvoai/zyvo   or   ZYVO_REPO=zyvoai/zyvo
+# Override with:  bash install.sh zyvoai/ZYVO-AI   or   ZYVO_REPO=zyvoai/ZYVO-AI
 # ---------------------------------------------------------------
-GITHUB_REPO="${1:-${ZYVO_REPO:-zyvoai/zyvo}}"
+GITHUB_REPO="${1:-${ZYVO_REPO:-zyvoai/ZYVO-AI}}"
 
 BINARY_NAME="zyvo"
 ASSET_PATTERN="android-aarch64.zip"

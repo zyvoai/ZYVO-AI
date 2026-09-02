@@ -25,7 +25,7 @@ glibc layer, and no extra overhead**.
 Then open Termux and run:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/zyvoai/zyvo/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/zyvoai/ZYVO-AI/main/install.sh | bash
 ```
 
 That's it — the installer checks your phone's architecture, installs
@@ -68,7 +68,7 @@ ICU, OpenTUI) for Android's own libc (bionic). The result is a single
 standalone binary that runs natively in Termux.
 
 Builds happen on GitHub Actions (`.github/workflows/android-build.yml`) and are
-published to [Releases](https://github.com/zyvoai/zyvo/releases). The build
+published to [Releases](https://github.com/zyvoai/ZYVO-AI/releases). The build
 system lives in [`android/`](android/README.md), based on
 [guysoft/opencode-termux](https://github.com/guysoft/opencode-termux) (MIT).
 
