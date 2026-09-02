@@ -17,7 +17,7 @@ set -euo pipefail
 # ---------------------------------------------------------------
 GITHUB_REPO="${1:-${ZYVO_REPO:-zyvoai/zyvo}}"
 
-BINARY_NAME="opencode"
+BINARY_NAME="zyvo"
 ASSET_PATTERN="android-aarch64.zip"
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
@@ -88,8 +88,8 @@ curl -fL --progress-bar "$ASSET_URL" -o "$ZIP_FILE" || die "Download failed."
 # ---------------------------------------------------------------
 # 4. Install
 #    The zip contains a Termux prefix layout:
-#      data/data/com.termux/files/usr/bin/opencode
-#      data/data/com.termux/files/usr/libexec/opencode/opencode.bin
+#      data/data/com.termux/files/usr/bin/zyvo
+#      data/data/com.termux/files/usr/libexec/zyvo/zyvo.bin
 #      data/data/com.termux/files/usr/lib/*.so
 # ---------------------------------------------------------------
 info "Installing..."
@@ -101,8 +101,8 @@ mkdir -p "$PREFIX/bin" "$PREFIX/libexec/opencode" "$PREFIX/lib"
 cp "${USR_DIR}/bin/${BINARY_NAME}" "$PREFIX/bin/${BINARY_NAME}"
 chmod +x "$PREFIX/bin/${BINARY_NAME}"
 # Android bun runtime (used by the binary for worker processes) + shared libs
-[ -f "${USR_DIR}/libexec/opencode/opencode.bin" ] && \
-  cp "${USR_DIR}/libexec/opencode/opencode.bin" "$PREFIX/libexec/opencode/opencode.bin"
+[ -f "${USR_DIR}/libexec/zyvo/zyvo.bin" ] && \
+  cp "${USR_DIR}/libexec/zyvo/zyvo.bin" "$PREFIX/libexec/zyvo/zyvo.bin"
 for so in "${USR_DIR}"/lib/*.so; do
   [ -f "$so" ] && cp "$so" "$PREFIX/lib/"
 done
@@ -111,9 +111,9 @@ rm -rf "$TMP_DIR"
 # ---------------------------------------------------------------
 # 4b. Deploy the Zyvo default config (50 free models via omniroute)
 # ---------------------------------------------------------------
-CONFIG_DIR="$HOME/.config/opencode"
-CONFIG_FILE="$CONFIG_DIR/opencode.json"
-CONFIG_URL="https://raw.githubusercontent.com/${GITHUB_REPO}/main/config/opencode.json"
+CONFIG_DIR="$HOME/.config/zyvo"
+CONFIG_FILE="$CONFIG_DIR/zyvo.json"
+CONFIG_URL="https://raw.githubusercontent.com/${GITHUB_REPO}/main/config/zyvo.json"
 if [ ! -f "$CONFIG_FILE" ]; then
   info "Installing Zyvo default config (free models)..."
   mkdir -p "$CONFIG_DIR"

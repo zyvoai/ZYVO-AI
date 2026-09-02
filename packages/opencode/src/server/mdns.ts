@@ -9,7 +9,7 @@ export function publish(port: number, domain?: string) {
 
   try {
     const host = domain ?? "opencode.local"
-    const name = `opencode-${port}`
+    const name = `zyvo-${port}`
     bonjour = new Bonjour()
     const service = bonjour.publish({
       name,

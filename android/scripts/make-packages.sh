@@ -17,11 +17,11 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/env.sh"
 
-OPENCODE_BINARY="$DIST_DIR/opencode"
+OPENCODE_BINARY="$DIST_DIR/zyvo"
 PKG_DIR="$WORK_DIR/packages"
 
 if [ ! -f "$OPENCODE_BINARY" ]; then
-    echo "ERROR: OpenCode binary not found at $OPENCODE_BINARY"
+    echo "ERROR: Zyvo binary not found at $OPENCODE_BINARY"
     echo "       Run scripts/build-opencode.sh first."
     exit 1
 fi
@@ -43,23 +43,23 @@ PREFIX_DIR="data/data/com.termux/files/usr"
 # ==========================================
 # Layout (matches the wrapper script's expectations):
 #   bin/opencode                    <- wrapper sh script (Android env fixes)
-#   libexec/opencode/opencode.bin   <- OUR standalone binary (this build)
+#   libexec/zyvo/zyvo.bin   <- OUR standalone binary (this build)
 #   lib/libopentui.so, libtagfix.so, libc++_shared.so
 echo ">>> Creating ZIP package..."
-ZIP_NAME="opencode-${OPENCODE_VERSION}-android-aarch64.zip"
+ZIP_NAME="zyvo-${OPENCODE_VERSION}-android-aarch64.zip"
 ZIP_STAGING="$PKG_DIR/zip-staging"
 mkdir -p "$ZIP_STAGING/$PREFIX_DIR/bin" \
-         "$ZIP_STAGING/$PREFIX_DIR/libexec/opencode" \
+         "$ZIP_STAGING/$PREFIX_DIR/libexec/zyvo" \
          "$ZIP_STAGING/$PREFIX_DIR/lib"
 
-cp "$DIST_DIR/opencode-wrapper" "$ZIP_STAGING/$PREFIX_DIR/bin/opencode"
-cp "$DIST_DIR/opencode"         "$ZIP_STAGING/$PREFIX_DIR/libexec/opencode/opencode.bin"
+cp "$DIST_DIR/opencode-wrapper" "$ZIP_STAGING/$PREFIX_DIR/bin/zyvo"
+cp "$DIST_DIR/zyvo"         "$ZIP_STAGING/$PREFIX_DIR/libexec/zyvo/zyvo.bin"
 for so in "$DIST_DIR"/*.so; do
     [ -f "$so" ] && cp "$so" "$ZIP_STAGING/$PREFIX_DIR/lib/"
 done
 
 cd "$ZIP_STAGING"
-chmod 755 "$PREFIX_DIR/bin/opencode" "$PREFIX_DIR/libexec/opencode/opencode.bin" 2>/dev/null || true
+chmod 755 "$PREFIX_DIR/bin/zyvo" "$PREFIX_DIR/libexec/zyvo/zyvo.bin" 2>/dev/null || true
 zip -9 -r "$PKG_DIR/$ZIP_NAME" data
 echo "    Created $ZIP_NAME"
 
@@ -72,7 +72,7 @@ mkdir -p "$PACMAN_STAGING"
 cp -r "$ZIP_STAGING/data" "$PACMAN_STAGING/"
 
 cat > "$PACMAN_STAGING/.PKGINFO" << EOF
-pkgname = opencode
+pkgname = zyvo
 pkgver = ${OPENCODE_VERSION}-1
 pkgdesc = AI-powered coding assistant for the terminal
 url = https://github.com/zyvoai/zyvo
@@ -99,7 +99,7 @@ cp -r "$ZIP_STAGING/data" "$DEB_STAGING/"
 
 INSTALLED_SIZE=$((BINARY_SIZE / 1024))
 cat > "$DEB_STAGING/DEBIAN/control" << EOF
-Package: opencode
+Package: zyvo
 Version: ${OPENCODE_VERSION}
 Architecture: aarch64
 Maintainer: zyvo

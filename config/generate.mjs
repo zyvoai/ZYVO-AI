@@ -4,8 +4,8 @@
  *
  * Fetches the model list from the omniroute endpoint (GET /models), ranks it
  * (family priority -> context size -> name), and writes the top 50 as the
- * default "Zyvo" provider into config/opencode.json — which install.sh
- * deploys to ~/.config/opencode/opencode.json on the phone.
+ * default "Zyvo" provider into config/zyvo.json — which install.sh
+ * deploys to ~/.config/opencode/zyvo.json on the phone.
  *
  * Usage:
  *   node config/generate.mjs <baseURL> <apiKey> [modelListFile]
@@ -122,7 +122,7 @@ const config = {
 }
 
 const here = path.dirname(fileURLToPath(import.meta.url))
-const out = path.join(here, "opencode.json")
+const out = path.join(here, "zyvo.json")
 fs.writeFileSync(out, JSON.stringify(config, null, 2) + "\n")
 console.log(`Wrote ${out} (${top.length} models, default: zyvo/${top[0].id})`)
 console.log("NOTE: apiKey is baked in this file — do not publish the repo if the key is secret.")

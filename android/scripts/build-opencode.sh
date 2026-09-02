@@ -146,7 +146,7 @@ fi
 if [ -f "$PREBUILT_DIR/opencode.bin" ]; then cp "$PREBUILT_DIR/opencode.bin" "$DIST_DIR/opencode-prebuilt.bin"; fi
 
 # Verify output
-OPENCODE_BINARY="$DIST_DIR/opencode"
+OPENCODE_BINARY="$DIST_DIR/zyvo"
 if [ ! -f "$OPENCODE_BINARY" ]; then
     echo "ERROR: OpenCode binary not found at $OPENCODE_BINARY"
     exit 1

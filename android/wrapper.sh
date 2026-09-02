@@ -70,14 +70,14 @@ if [ -n "$NATIVE_LIB_DIR" ]; then
         export OPENCODE_BUN_PATH="$NATIVE_LIB_DIR/bun"
     fi
 else
-    echo "opencode: warning: native library directory not found, may crash on Android 11+" >&2
+    echo "zyvo: warning: native library directory not found, may crash on Android 11+" >&2
 fi
 
 # Locate opencode.bin. Prefer the package layout first so upgrades do not
 # accidentally execute a stale flat-layout binary left in $PREFIX/bin.
 for candidate in \
-    "$dir/../libexec/opencode/opencode.bin" \
-    "${PREFIX:-/data/data/com.termux/files/usr}/libexec/opencode/opencode.bin" \
+    "$dir/../libexec/zyvo/zyvo.bin" \
+    "${PREFIX:-/data/data/com.termux/files/usr}/libexec/zyvo/zyvo.bin" \
     "$dir/opencode.bin"
 do
     if [ -x "$candidate" ]; then
@@ -85,5 +85,5 @@ do
     fi
 done
 
-echo "opencode: error: could not find opencode.bin" >&2
+echo "zyvo: error: could not find opencode.bin" >&2
 exit 127

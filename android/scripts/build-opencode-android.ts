@@ -148,7 +148,7 @@ const result = await Bun.build({
     autoloadTsconfig: true,
     autoloadPackageJson: true,
     outfile: hostBinaryPath,
-    execArgv: [`--user-agent=opencode/${VERSION}`, "--use-system-ca", "--"],
+    execArgv: [`--user-agent=zyvo/${VERSION}`, "--use-system-ca", "--"],
   },
   entrypoints: ["./src/index.ts", parserWorkerResolved, workerPath],
   define: {
