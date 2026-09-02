@@ -109,6 +109,24 @@ done
 rm -rf "$TMP_DIR"
 
 # ---------------------------------------------------------------
+# 4b. Deploy the Zyvo default config (50 free models via omniroute)
+# ---------------------------------------------------------------
+CONFIG_DIR="$HOME/.config/opencode"
+CONFIG_FILE="$CONFIG_DIR/opencode.json"
+CONFIG_URL="https://raw.githubusercontent.com/${GITHUB_REPO}/main/config/opencode.json"
+if [ ! -f "$CONFIG_FILE" ]; then
+  info "Installing Zyvo default config (free models)..."
+  mkdir -p "$CONFIG_DIR"
+  if curl -fsSL "$CONFIG_URL" -o "$CONFIG_FILE" 2>/dev/null && [ -s "$CONFIG_FILE" ]; then
+    info "Config ready: models appear inside zyvo automatically"
+  else
+    warn "Could not download config — you can add it later from the repo (config/opencode.json)"
+  fi
+else
+  info "Existing config kept ($CONFIG_FILE)"
+fi
+
+# ---------------------------------------------------------------
 # 5. Smoke test
 # ---------------------------------------------------------------
 info "Verifying installation..."
