@@ -97,15 +97,24 @@ unzip -o "$ZIP_FILE" -d "$TMP_DIR" >/dev/null
 USR_DIR="${TMP_DIR}/data/data/com.termux/files/usr"
 [ -f "${USR_DIR}/bin/${BINARY_NAME}" ] || die "Downloaded archive does not contain ${BINARY_NAME}."
 
-mkdir -p "$PREFIX/bin" "$PREFIX/libexec/opencode" "$PREFIX/lib"
+mkdir -p "$PREFIX/bin" "$PREFIX/libexec/zyvo" "$PREFIX/lib"
 cp "${USR_DIR}/bin/${BINARY_NAME}" "$PREFIX/bin/${BINARY_NAME}"
-chmod +x "$PREFIX/bin/${BINARY_NAME}"
-# Android bun runtime (used by the binary for worker processes) + shared libs
-[ -f "${USR_DIR}/libexec/zyvo/zyvo.bin" ] && \
+chmod 755 "$PREFIX/bin/${BINARY_NAME}"
+# Android bun runtime (used by the binary for worker processes) + shared libs.
+# chmod explicitly: cp/unzip can land with 644, which makes the wrapper's
+# -x check fail with "could not find zyvo.bin".
+if [ -f "${USR_DIR}/libexec/zyvo/zyvo.bin" ]; then
   cp "${USR_DIR}/libexec/zyvo/zyvo.bin" "$PREFIX/libexec/zyvo/zyvo.bin"
+  chmod 755 "$PREFIX/libexec/zyvo/zyvo.bin"
+else
+  die "Downloaded archive does not contain the zyvo binary."
+fi
 for so in "${USR_DIR}"/lib/*.so; do
   [ -f "$so" ] && cp "$so" "$PREFIX/lib/"
 done
+# Clean up leftovers from the pre-rebrand opencode install
+rm -f "$PREFIX/bin/opencode" 2>/dev/null || true
+rm -rf "$PREFIX/libexec/opencode" 2>/dev/null || true
 rm -rf "$TMP_DIR"
 
 # ---------------------------------------------------------------
@@ -120,7 +129,7 @@ if [ ! -f "$CONFIG_FILE" ]; then
   if curl -fsSL "$CONFIG_URL" -o "$CONFIG_FILE" 2>/dev/null && [ -s "$CONFIG_FILE" ]; then
     info "Config ready: models appear inside zyvo automatically"
   else
-    warn "Could not download config — you can add it later from the repo (config/opencode.json)"
+    warn "Could not download config — you can add it later from the repo (config/zyvo.json)"
   fi
 else
   info "Existing config kept ($CONFIG_FILE)"

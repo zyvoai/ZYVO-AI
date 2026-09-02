@@ -1,6 +1,5 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "_comment": "PLACEHOLDER — run `node config/generate.mjs <baseURL> <apiKey>` with the real omniroute endpoint + key to generate the ranked top-50 model list. Replace the values below meanwhile.",
   "model": "zyvo/PLACEHOLDER-MODEL",
   "provider": {
     "zyvo": {

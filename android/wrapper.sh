@@ -73,17 +73,30 @@ else
     echo "zyvo: warning: native library directory not found, may crash on Android 11+" >&2
 fi
 
-# Locate opencode.bin. Prefer the package layout first so upgrades do not
+# Locate zyvo.bin. Prefer the package layout first so upgrades do not
 # accidentally execute a stale flat-layout binary left in $PREFIX/bin.
 for candidate in \
     "$dir/../libexec/zyvo/zyvo.bin" \
     "${PREFIX:-/data/data/com.termux/files/usr}/libexec/zyvo/zyvo.bin" \
-    "$dir/opencode.bin"
+    "$dir/zyvo.bin"
 do
     if [ -x "$candidate" ]; then
         exec "$candidate" "$@"
     fi
 done
 
-echo "zyvo: error: could not find opencode.bin" >&2
+echo "zyvo: error: could not find zyvo.bin" >&2
 exit 127
+
+# Last resort: binary present but lost its exec bit (cp/unzip landed 644) —
+# fix and retry instead of failing.
+for candidate in \
+    "$dir/../libexec/zyvo/zyvo.bin" \
+    "${PREFIX:-/data/data/com.termux/files/usr}/libexec/zyvo/zyvo.bin" \
+    "$dir/zyvo.bin"
+do
+    if [ -f "$candidate" ]; then
+        chmod 755 "$candidate" 2>/dev/null || true
+        exec "$candidate" "$@"
+    fi
+done
