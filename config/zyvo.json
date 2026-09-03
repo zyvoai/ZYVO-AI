@@ -83,6 +83,88 @@
           "name": "Agnes AI: Agnes 2.5 Flash"
         }
       }
+    },
+    "omniroute": {
+      "name": "OmniRoute",
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "https://jaguar-event-lawyer-downloaded.trycloudflare.com/v1",
+        "apiKey": ""
+      },
+      "models": {
+        "auto/best-coding": {
+          "name": "Best Coding"
+        },
+        "auto/best-reasoning": {
+          "name": "Best Reasoning"
+        },
+        "auto/best-fast": {
+          "name": "Best Fast"
+        },
+        "auto/best-chat": {
+          "name": "Best Chat"
+        },
+        "auto/best-free": {
+          "name": "Best Free"
+        },
+        "auto/pro-coding": {
+          "name": "Pro Coding"
+        },
+        "auto/pro-reasoning": {
+          "name": "Pro Reasoning"
+        },
+        "auto/pro-chat": {
+          "name": "Pro Chat"
+        },
+        "kc/stepfun/step-3.7-flash:free": {
+          "name": "StepFun: Step 3.7 Flash (free)"
+        },
+        "kc/inclusionai/ling-3.0-flash-fin:free": {
+          "name": "Ling 3.0 Flash Fin (free)"
+        },
+        "kc/dots-studio/dots-3-note-preview:free": {
+          "name": "Dots Studio: Dots3-Note Preview (free)"
+        },
+        "kc/liquid/lfm-2.5-2.6b:free": {
+          "name": "LiquidAI: LFM2.5-2.6B (free)"
+        },
+        "kc/nvidia/nemotron-3.5-lightning:free": {
+          "name": "NVIDIA: Nemotron 3.5 Lightning (free)"
+        },
+        "kc/poolside/laguna-s-2.1:free": {
+          "name": "Poolside: Laguna S 2.1 (free)"
+        },
+        "kc/poolside/laguna-xs-2.1:free": {
+          "name": "Poolside: Laguna XS 2.1 (free)"
+        },
+        "kc/cohere/north-mini-code:free": {
+          "name": "Cohere: North Mini Code (free)"
+        },
+        "kc/nvidia/nemotron-3-ultra-550b-a55b:free": {
+          "name": "NVIDIA: Nemotron 3 Ultra (free)"
+        },
+        "kc/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free": {
+          "name": "NVIDIA: Nemotron 3 Nano Omni (free)"
+        },
+        "kc/nvidia/nemotron-3-super-120b-a12b:free": {
+          "name": "NVIDIA: Nemotron 3 Super (free)"
+        },
+        "kc/minimax/minimax-m3:free": {
+          "name": "MiniMax: MiniMax M3 (free)"
+        },
+        "kc/minimax/minimax-m2.7:free": {
+          "name": "MiniMax: MiniMax M2.7 (free)"
+        },
+        "opencode/big-pickle": {
+          "name": "Big Pickle (free)"
+        },
+        "agnes/agnes-2.0-flash": {
+          "name": "Agnes AI: Agnes 2.0 Flash"
+        },
+        "agnes/agnes-2.5-flash": {
+          "name": "Agnes AI: Agnes 2.5 Flash"
+        }
+      }
     }
   }
 }
