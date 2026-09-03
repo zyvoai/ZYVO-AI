@@ -7,7 +7,7 @@
       "npm": "@ai-sdk/openai-compatible",
       "options": {
         "baseURL": "https://jaguar-event-lawyer-downloaded.trycloudflare.com/v1",
-        "apiKey": "sk-397a485ebe5ead01-3502cf-9b868f70"
+        "apiKey": "sk-397a485ebe5ead01-980697-32d3480d"
       },
       "models": {
         "auto/best-coding": {
@@ -22,9 +22,6 @@
         "auto/best-chat": {
           "name": "Best Chat"
         },
-        "auto/best-vision": {
-          "name": "Best Vision"
-        },
         "auto/best-free": {
           "name": "Best Free"
         },
@@ -37,128 +34,53 @@
         "auto/pro-chat": {
           "name": "Pro Chat"
         },
-        "auto/pro-fast": {
-          "name": "Pro Fast"
-        },
-        "auto/pro-vision": {
-          "name": "Pro Vision"
-        },
-        "auto/coding": {
-          "name": "Coding"
-        },
-        "auto/coding:pro": {
-          "name": "Pro"
-        },
-        "auto/coding:fast": {
-          "name": "Fast"
-        },
-        "auto/coding:cheap": {
-          "name": "Cheap"
-        },
-        "auto/coding:reliable": {
-          "name": "Reliable"
-        },
-        "auto/reasoning": {
-          "name": "Reasoning"
-        },
-        "auto/reasoning:pro": {
-          "name": "Pro"
-        },
-        "auto/chat": {
-          "name": "Chat"
-        },
-        "auto/fast": {
-          "name": "Fast"
-        },
-        "auto/cheap": {
-          "name": "Cheap"
-        },
-        "auto/smart": {
-          "name": "Smart"
-        },
-        "auto/chaos": {
-          "name": "Chaos"
-        },
-        "auto/best-chaos": {
-          "name": "Best Chaos"
-        },
-        "auto/glm": {
-          "name": "glm"
-        },
-        "auto/zai": {
-          "name": "zai"
-        },
-        "auto/mimo": {
-          "name": "Mimo"
-        },
-        "auto/gemini": {
-          "name": "Gemini"
-        },
-        "auto/minimax": {
-          "name": "Minimax"
-        },
-        "auto/llama": {
-          "name": "Llama"
-        },
-        "auto/vision": {
-          "name": "Vision"
-        },
-        "auto/multimodal": {
-          "name": "Multimodal"
-        },
-        "auto/offline": {
-          "name": "Offline"
-        },
-        "auto/claude-opus": {
-          "name": "Claude Opus"
-        },
-        "auto/claude-sonnet": {
-          "name": "Claude Sonnet"
-        },
-        "auto/gemma": {
-          "name": "Gemma"
-        },
-        "kc/step-3.7-flash:free": {
-          "name": "Free"
-        },
-        "kc/minimax/minimax-m3:free": {
-          "name": "Free"
-        },
-        "kc/liquid/lfm-2.5-2.6b:free": {
-          "name": "Free"
-        },
-        "kc/minimax/minimax-m2.7:free": {
-          "name": "Free"
-        },
-        "kc/poolside/laguna-s-2.1:free": {
-          "name": "Free"
-        },
         "kc/stepfun/step-3.7-flash:free": {
-          "name": "Free"
-        },
-        "kc/poolside/laguna-xs-2.1:free": {
-          "name": "Free"
-        },
-        "kc/cohere/north-mini-code:free": {
-          "name": "Free"
-        },
-        "kc/nemotron-3-ultra-550b-a55b:free": {
-          "name": "Free"
-        },
-        "kc/nvidia/nemotron-3.5-lightning:free": {
-          "name": "Free"
+          "name": "StepFun: Step 3.7 Flash (free)"
         },
         "kc/inclusionai/ling-3.0-flash-fin:free": {
-          "name": "Free"
+          "name": "Ling 3.0 Flash Fin (free)"
         },
         "kc/dots-studio/dots-3-note-preview:free": {
-          "name": "Free"
+          "name": "Dots Studio: Dots3-Note Preview (free)"
+        },
+        "kc/liquid/lfm-2.5-2.6b:free": {
+          "name": "LiquidAI: LFM2.5-2.6B (free)"
+        },
+        "kc/nvidia/nemotron-3.5-lightning:free": {
+          "name": "NVIDIA: Nemotron 3.5 Lightning (free)"
+        },
+        "kc/poolside/laguna-s-2.1:free": {
+          "name": "Poolside: Laguna S 2.1 (free)"
+        },
+        "kc/poolside/laguna-xs-2.1:free": {
+          "name": "Poolside: Laguna XS 2.1 (free)"
+        },
+        "kc/cohere/north-mini-code:free": {
+          "name": "Cohere: North Mini Code (free)"
         },
         "kc/nvidia/nemotron-3-ultra-550b-a55b:free": {
-          "name": "Free"
+          "name": "NVIDIA: Nemotron 3 Ultra (free)"
+        },
+        "kc/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free": {
+          "name": "NVIDIA: Nemotron 3 Nano Omni (free)"
         },
         "kc/nvidia/nemotron-3-super-120b-a12b:free": {
-          "name": "Free"
+          "name": "NVIDIA: Nemotron 3 Super (free)"
+        },
+        "kc/minimax/minimax-m3:free": {
+          "name": "MiniMax: MiniMax M3 (free)"
+        },
+        "kc/minimax/minimax-m2.7:free": {
+          "name": "MiniMax: MiniMax M2.7 (free)"
+        },
+        "opencode/big-pickle": {
+          "name": "Big Pickle (free)"
+        },
+        "agnes/agnes-2.0-flash": {
+          "name": "Agnes AI: Agnes 2.0 Flash"
+        },
+        "agnes/agnes-2.5-flash": {
+          "name": "Agnes AI: Agnes 2.5 Flash"
         }
       }
     }
