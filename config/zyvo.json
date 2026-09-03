@@ -1,17 +1,167 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "zyvo/PLACEHOLDER-MODEL",
+  "model": "zyvo/auto/best-coding",
+  "enabled_providers": [
+    "zyvo"
+  ],
   "provider": {
     "zyvo": {
       "name": "Zyvo",
       "npm": "@ai-sdk/openai-compatible",
       "options": {
-        "baseURL": "https://YOUR-OMNIROUTE-ENDPOINT/v1",
-        "apiKey": "YOUR-OMNIROUTE-KEY"
+        "baseURL": "http://localhost:20128/v1",
+        "apiKey": "sk-397a485ebe5ead01-3502cf-9b868f70"
       },
       "models": {
-        "PLACEHOLDER-MODEL": {
-          "name": "Zyvo default model"
+        "auto/best-coding": {
+          "name": "Best Coding"
+        },
+        "auto/best-reasoning": {
+          "name": "Best Reasoning"
+        },
+        "auto/best-fast": {
+          "name": "Best Fast"
+        },
+        "auto/best-chat": {
+          "name": "Best Chat"
+        },
+        "auto/best-vision": {
+          "name": "Best Vision"
+        },
+        "auto/best-free": {
+          "name": "Best Free"
+        },
+        "auto/pro-coding": {
+          "name": "Pro Coding"
+        },
+        "auto/pro-reasoning": {
+          "name": "Pro Reasoning"
+        },
+        "auto/pro-chat": {
+          "name": "Pro Chat"
+        },
+        "auto/pro-fast": {
+          "name": "Pro Fast"
+        },
+        "auto/pro-vision": {
+          "name": "Pro Vision"
+        },
+        "auto/coding": {
+          "name": "Coding"
+        },
+        "auto/coding:pro": {
+          "name": "Pro"
+        },
+        "auto/coding:fast": {
+          "name": "Fast"
+        },
+        "auto/coding:cheap": {
+          "name": "Cheap"
+        },
+        "auto/coding:reliable": {
+          "name": "Reliable"
+        },
+        "auto/reasoning": {
+          "name": "Reasoning"
+        },
+        "auto/reasoning:pro": {
+          "name": "Pro"
+        },
+        "auto/chat": {
+          "name": "Chat"
+        },
+        "auto/fast": {
+          "name": "Fast"
+        },
+        "auto/cheap": {
+          "name": "Cheap"
+        },
+        "auto/smart": {
+          "name": "Smart"
+        },
+        "auto/chaos": {
+          "name": "Chaos"
+        },
+        "auto/best-chaos": {
+          "name": "Best Chaos"
+        },
+        "auto/glm": {
+          "name": "glm"
+        },
+        "auto/zai": {
+          "name": "zai"
+        },
+        "auto/mimo": {
+          "name": "Mimo"
+        },
+        "auto/gemini": {
+          "name": "Gemini"
+        },
+        "auto/minimax": {
+          "name": "Minimax"
+        },
+        "auto/llama": {
+          "name": "Llama"
+        },
+        "auto/vision": {
+          "name": "Vision"
+        },
+        "auto/multimodal": {
+          "name": "Multimodal"
+        },
+        "auto/offline": {
+          "name": "Offline"
+        },
+        "auto/claude-opus": {
+          "name": "Claude Opus"
+        },
+        "auto/claude-sonnet": {
+          "name": "Claude Sonnet"
+        },
+        "auto/gemma": {
+          "name": "Gemma"
+        },
+        "kc/step-3.7-flash:free": {
+          "name": "Free"
+        },
+        "kc/minimax/minimax-m3:free": {
+          "name": "Free"
+        },
+        "kc/liquid/lfm-2.5-2.6b:free": {
+          "name": "Free"
+        },
+        "kc/minimax/minimax-m2.7:free": {
+          "name": "Free"
+        },
+        "kc/poolside/laguna-s-2.1:free": {
+          "name": "Free"
+        },
+        "kc/stepfun/step-3.7-flash:free": {
+          "name": "Free"
+        },
+        "kc/poolside/laguna-xs-2.1:free": {
+          "name": "Free"
+        },
+        "kc/cohere/north-mini-code:free": {
+          "name": "Free"
+        },
+        "kc/nemotron-3-ultra-550b-a55b:free": {
+          "name": "Free"
+        },
+        "kc/nvidia/nemotron-3.5-lightning:free": {
+          "name": "Free"
+        },
+        "kc/inclusionai/ling-3.0-flash-fin:free": {
+          "name": "Free"
+        },
+        "kc/dots-studio/dots-3-note-preview:free": {
+          "name": "Free"
+        },
+        "kc/nvidia/nemotron-3-ultra-550b-a55b:free": {
+          "name": "Free"
+        },
+        "kc/nvidia/nemotron-3-super-120b-a12b:free": {
+          "name": "Free"
         }
       }
     }
