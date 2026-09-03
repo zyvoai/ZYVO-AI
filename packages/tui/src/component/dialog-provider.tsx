@@ -117,6 +117,66 @@ export function createDialogProviderOptions() {
     return promptCustomProviderID()
   }
 
+  async function connectRouter(kind: "omniroute" | "9router"): Promise<void> {
+    const brand = kind === "omniroute" ? "OmniRoute" : "9Router"
+    const key = await DialogPrompt.show(dialog, `${brand} API key`, {
+      placeholder: "sk-...",
+    })
+    if (!key) return
+    const endpoint = await DialogPrompt.show(dialog, `${brand} endpoint URL`, {
+      placeholder: "https://example.com/v1",
+    })
+    if (!endpoint) return
+    const model = await DialogPrompt.show(dialog, `${brand} exact model name`, {
+      placeholder: "provider/model-id",
+      description: () => (
+        <text fg={theme.textMuted}>Type the model name exactly as the API expects it.</text>
+      ),
+    })
+    if (!model) return
+    try {
+      const current = await sdk.client.config.get({}, { throwOnError: true })
+      const config = { ...(current.data as Record<string, any>) } as Record<string, any>
+      config.provider = config.provider ?? {}
+      const existing = config.provider[kind] ?? {}
+      config.provider[kind] = {
+        ...existing,
+        name: brand,
+        npm: "@ai-sdk/openai-compatible",
+        options: { ...(existing.options ?? {}), baseURL: endpoint, apiKey: key },
+        models: { ...(existing.models ?? {}), [model]: { name: model } },
+      }
+      await sdk.client.config.update({ config }, { throwOnError: true })
+    } catch {
+      toast.show({ variant: "error", message: `${brand}: failed to save connection` })
+      return
+    }
+    await sdk.client.instance.dispose()
+    await sync.bootstrap()
+    toast.show({ variant: "success", message: `${brand} connected - model "${model}" is ready in the picker` })
+  }
+
+  const routerOptions = [
+    {
+      title: "OmniRoute",
+      value: "connect-omniroute",
+      description: "(Recommended) - key + endpoint + model",
+      category: "Popular",
+      async onSelect() {
+        await connectRouter("omniroute")
+      },
+    },
+    {
+      title: "9Router",
+      value: "connect-9router",
+      description: "(Recommended) - key + endpoint + model",
+      category: "Popular",
+      async onSelect() {
+        await connectRouter("9router")
+      },
+    },
+  ]
+
   const options = createMemo(() => {
     return pipe(
       providerOptions(sync.data.provider_next.all),
