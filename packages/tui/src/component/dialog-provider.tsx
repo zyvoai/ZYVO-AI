@@ -284,7 +284,9 @@ export function createDialogProviderOptions() {
           },
         }
       }),
-    )
+      ),
+      ...routerOptions,
+    ]
   })
   return options
 }
