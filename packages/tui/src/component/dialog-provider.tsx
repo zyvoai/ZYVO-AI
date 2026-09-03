@@ -178,7 +178,8 @@ export function createDialogProviderOptions() {
   ]
 
   const options = createMemo(() => {
-    return pipe(
+    return [
+      ...pipe(
       providerOptions(sync.data.provider_next.all),
       map((provider) => {
         if (provider.type === "custom") {
