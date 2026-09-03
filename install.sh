@@ -119,20 +119,23 @@ rm -rf "$TMP_DIR"
 
 # ---------------------------------------------------------------
 # 4b. Deploy the Zyvo default config (50 free models via omniroute)
+#     Always refresh so model-list updates reach the phone; any previous
+#     config is kept as zyvo.json.bak so nothing is lost.
 # ---------------------------------------------------------------
 CONFIG_DIR="$HOME/.config/zyvo"
 CONFIG_FILE="$CONFIG_DIR/zyvo.json"
 CONFIG_URL="https://raw.githubusercontent.com/${GITHUB_REPO}/main/config/zyvo.json"
-if [ ! -f "$CONFIG_FILE" ]; then
-  info "Installing Zyvo default config (free models)..."
-  mkdir -p "$CONFIG_DIR"
-  if curl -fsSL "$CONFIG_URL" -o "$CONFIG_FILE" 2>/dev/null && [ -s "$CONFIG_FILE" ]; then
-    info "Config ready: models appear inside zyvo automatically"
-  else
-    warn "Could not download config — you can add it later from the repo (config/zyvo.json)"
+mkdir -p "$CONFIG_DIR"
+if curl -fsSL "$CONFIG_URL" -o "$CONFIG_FILE.tmp" 2>/dev/null && [ -s "$CONFIG_FILE.tmp" ]; then
+  if [ -f "$CONFIG_FILE" ]; then
+    cp "$CONFIG_FILE" "$CONFIG_FILE.bak"
+    info "Previous config backed up to zyvo.json.bak"
   fi
+  mv "$CONFIG_FILE.tmp" "$CONFIG_FILE"
+  info "Config updated: 50 models via your Zyvo provider"
 else
-  info "Existing config kept ($CONFIG_FILE)"
+  rm -f "$CONFIG_FILE.tmp"
+  warn "Could not download config — you can add it later from the repo (config/zyvo.json)"
 fi
 
 # ---------------------------------------------------------------
