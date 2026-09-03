@@ -194,8 +194,12 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         }
       }
 
+      // zyvo: never auto-connect the legacy keyless catalog provider — zyvo's
+      // own default provider (config) is the only one that ships connected.
+      // Users can still add any provider themselves (auth login / config),
+      // which connects through the auth/config paths, not this loader.
       return {
-        autoload: Object.keys(input.models).length > 0,
+        autoload: ok,
         options: ok ? {} : { apiKey: "public" },
       }
     }),

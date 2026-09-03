@@ -1,15 +1,12 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "model": "zyvo/auto/best-coding",
-  "enabled_providers": [
-    "zyvo"
-  ],
   "provider": {
     "zyvo": {
       "name": "Zyvo",
       "npm": "@ai-sdk/openai-compatible",
       "options": {
-        "baseURL": "http://localhost:20128/v1",
+        "baseURL": "https://jaguar-event-lawyer-downloaded.trycloudflare.com/v1",
         "apiKey": "sk-397a485ebe5ead01-3502cf-9b868f70"
       },
       "models": {
