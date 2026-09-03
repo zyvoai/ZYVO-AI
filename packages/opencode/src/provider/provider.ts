@@ -1674,7 +1674,9 @@ export const layer = Layer.effect(
         // zyvo: a key the user entered via auth login always wins over the
         // baked default key from our shipped config
         if (model.providerID === "zyvo") {
-          const userKey = yield* auth.get("zyvo").pipe(Effect.orElseSucceed(() => undefined))
+          const userKey = await Effect.runPromise(
+            auth.get("zyvo").pipe(Effect.orElseSucceed(() => undefined)),
+          ).catch(() => undefined)
           if (userKey?.type === "api") options["apiKey"] = userKey.key
         }
         if (model.headers)
