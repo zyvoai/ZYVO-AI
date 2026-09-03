@@ -184,6 +184,10 @@ export function sortModelOptions<T extends { footer?: string; releaseDate: strin
   options: T[],
   newestFirst: boolean,
 ) {
+  // zyvo: models from our config provider arrive in curated order (best first)
+  // — preserve it instead of re-sorting alphabetically.
+  const first = options[0] as { value?: { providerID?: string } } | undefined
+  if (first?.value?.providerID === "zyvo") return options
   if (newestFirst) return sortBy(options, [(option) => option.releaseDate, "desc"], (option) => option.title)
   return sortBy(
     options,
