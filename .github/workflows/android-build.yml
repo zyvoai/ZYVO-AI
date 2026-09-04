@@ -147,6 +147,7 @@ jobs:
           name: opencode-termux-${{ env.OPENCODE_VERSION }}
           path: |
             ${{ env.WORK_DIR }}/packages/*.zip
+            ${{ env.WORK_DIR }}/packages/*.tar.zst
             ${{ env.WORK_DIR }}/packages/*.pkg.tar.xz
             ${{ env.WORK_DIR }}/packages/*.deb
 

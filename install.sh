@@ -19,7 +19,7 @@ for arg in "$@"; do
 done
 
 BINARY_NAME="zyvo"
-ASSET_PATTERN="android-aarch64.zip"
+ASSET_PATTERN="android-aarch64.tar.zst"
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
 info()  { echo -e "${GREEN}==>${NC} $1"; }
@@ -38,6 +38,7 @@ esac
 
 command -v curl >/dev/null 2>&1 || { info "Installing curl..."; pkg install -y curl; }
 command -v unzip >/dev/null 2>&1 || { info "Installing unzip..."; pkg install -y unzip; }
+command -v zstd >/dev/null 2>&1 || { info "Installing zstd..."; pkg install -y zstd; }
 
 # ---------------------------------------------------------------
 # 2. Dependencies
@@ -176,7 +177,7 @@ fi
 # 7. Install (zip = Termux prefix layout)
 # ---------------------------------------------------------------
 info "Installing..."
-unzip -o "$ZIP_FILE" -d "$TMP_DIR" >/dev/null
+tar --zstd -xf "$ZIP_FILE" -C "$TMP_DIR"
 USR_DIR="${TMP_DIR}/data/data/com.termux/files/usr"
 [ -f "${USR_DIR}/bin/${BINARY_NAME}" ] || die "Downloaded archive does not contain ${BINARY_NAME}."
 

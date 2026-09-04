@@ -152,6 +152,14 @@ if [ ! -f "$OPENCODE_BINARY" ]; then
     exit 1
 fi
 
+# Strip debug/symbol data — binaries ship "not stripped" and carry a lot
+# of dead weight; stripping typically shrinks them dramatically.
+if [ -x "${ANDROID_STRIP:-}" ]; then
+    echo ">>> Stripping binary..."
+    "$ANDROID_STRIP" --strip-all "$DIST_DIR/zyvo" || echo "WARNING: strip failed (continuing unstripped)"
+    ls -lh "$DIST_DIR/zyvo"
+fi
+
 echo ""
 echo "=== OpenCode build complete ==="
 echo "Binary: $OPENCODE_BINARY"

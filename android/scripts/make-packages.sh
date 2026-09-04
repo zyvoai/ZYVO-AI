@@ -64,7 +64,18 @@ zip -9 -r "$PKG_DIR/$ZIP_NAME" data
 echo "    Created $ZIP_NAME"
 
 # ==========================================
+# 1b. ZSTD package (smaller + faster to unpack on the phone)
+# ==========================================
+echo ">>> Creating ZSTD package..."
+ZSTD_NAME="zyvo-${OPENCODE_VERSION}-android-aarch64.tar.zst"
+cd "$ZIP_STAGING"
+tar --zstd -cf "$PKG_DIR/$ZSTD_NAME" data
+echo "    Created $ZSTD_NAME"
+
+# ==========================================
 # 2. Pacman package (Termux)
+# ==========================================
+echo ">>> Creating pacman package..."
 # ==========================================
 echo ">>> Creating pacman package..."
 PACMAN_STAGING="$PKG_DIR/pacman-staging"
