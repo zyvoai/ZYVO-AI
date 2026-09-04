@@ -152,6 +152,13 @@ fi
 for so in "${USR_DIR}"/lib/*.so; do
   [ -f "$so" ] && cp "$so" "$PREFIX/lib/"
 done
+# Always ship the latest wrapper from the repo (wrapper fixes reach phones
+# without a full binary release)
+WRAPPER_URL="https://raw.githubusercontent.com/${GITHUB_REPO}/main/android/wrapper.sh"
+if curl -fsSL "$WRAPPER_URL" -o "$PREFIX/bin/${BINARY_NAME}.new" 2>/dev/null && [ -s "$PREFIX/bin/${BINARY_NAME}.new" ]; then
+  chmod 755 "$PREFIX/bin/${BINARY_NAME}.new"
+  mv "$PREFIX/bin/${BINARY_NAME}.new" "$PREFIX/bin/${BINARY_NAME}"
+fi
 rm -f "$PREFIX/bin/opencode" 2>/dev/null || true
 rm -rf "$PREFIX/libexec/opencode" 2>/dev/null || true
 rm -rf "$TMP_DIR"

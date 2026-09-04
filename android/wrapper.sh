@@ -12,6 +12,13 @@
 
 set -e
 
+# zyvo update - self-update via the remote installer
+if [ "${1:-}" = "update" ]; then
+  echo "==> Updating zyvo..."
+  curl -fsSL "https://raw.githubusercontent.com/zyvoai/ZYVO-AI/main/install.sh" | bash
+  exit $?
+fi
+
 dir="$(cd "$(dirname "$0")" && pwd)"
 export ANDROID_ROOT="${ANDROID_ROOT:-/system}"
 export TERMUX_VERSION="${TERMUX_VERSION:-opencode-termux}"
