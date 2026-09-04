@@ -1,0 +1,126 @@
+name: Build Zyvo for PC (Windows / macOS / Linux)
+
+# Builds the same rebranded Zyvo CLI for desktop platforms using the
+# upstream cross-compile script (packages/opencode/script/build.ts --single
+# per runner). Publishes everything to the pc-v<version> release.
+
+on:
+  workflow_dispatch:
+    inputs:
+      opencode_version:
+        description: 'Zyvo version to build'
+        required: false
+        default: '1.17.9'
+  push:
+    tags:
+      - 'pc-v*'
+
+env:
+  OPENCODE_VERSION: "1.17.9"
+
+jobs:
+  build:
+    name: Build ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x64
+            os: ubuntu-latest
+            package: tar
+          - name: linux-arm64
+            os: ubuntu-24.04-arm
+            package: tar
+          - name: darwin-arm64
+            os: macos-latest
+            package: zip
+          - name: darwin-x64
+            os: macos-latest
+            package: zip
+          - name: windows-x64
+            os: windows-latest
+            package: zip
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Override version from input
+        if: github.event.inputs.opencode_version
+        run: echo "OPENCODE_VERSION=${{ github.event.inputs.opencode_version }}" >> $GITHUB_ENV
+
+      - name: Install Bun (pinned by packages/script)
+        shell: bash
+        run: |
+          HOST_BUN_VERSION="1.3.14"
+          curl -fsSL https://bun.sh/install | bash -s "bun-v${HOST_BUN_VERSION}"
+          echo "$HOME/.bun/bin" >> $GITHUB_PATH
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          bun install
+
+      - name: Build (single target, native)
+        shell: bash
+        working-directory: packages/opencode
+        run: |
+          bun run script/build.ts --single --skip-embed-web-ui
+
+      - name: Package (rename to zyvo)
+        shell: bash
+        working-directory: packages/opencode/dist
+        run: |
+          set -e
+          DIR=$(ls -d */bin 2>/dev/null | head -1 | xargs dirname)
+          mv "$DIR/bin/opencode" "$DIR/bin/zyvo" 2>/dev/null || true
+          VERSION="${OPENCODE_VERSION}"
+          if [ "${{ matrix.package }}" = "tar" ]; then
+            tar -czf "zyvo-${VERSION}-${{ matrix.name }}.tar.gz" -C "$DIR/bin" zyvo
+          else
+            zip -q "zyvo-${VERSION}-${{ matrix.name }}.zip" "$DIR/bin/zyvo"
+          fi
+          ls -lh zyvo-*
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: zyvo-${{ matrix.name }}
+          path: packages/opencode/dist/zyvo-*
+
+  release:
+    name: Publish PC release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          path: assets
+
+      - name: List assets
+        run: ls -lh assets/
+
+      - name: Create/update PC release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: pc-v${{ env.OPENCODE_VERSION }}
+          files: assets/*
+          body: |
+            ## Zyvo ${{ env.OPENCODE_VERSION }} for desktop
+
+            Same Zyvo experience on your computer.
+            - Linux: download .tar.gz, extract, run `./zyvo`
+            - macOS: download .zip, extract, run `./zyvo` (allow in Gatekeeper if asked)
+            - Windows: download .zip, extract, run `zyvo.exe`
+
+            Config lives in `~/.config/zyvo/zyvo.json` (same model list as mobile).
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
