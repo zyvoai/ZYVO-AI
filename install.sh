@@ -159,7 +159,18 @@ ASSET_URL="$(echo "$RELEASE_JSON" | grep -o "\"browser_download_url\": *\"[^\"]*
 info "Downloading: $ASSET_URL"
 TMP_DIR="$(mktemp -d)"
 ZIP_FILE="${TMP_DIR}/${BINARY_NAME}.zip"
-curl -fL --progress-bar "$ASSET_URL" -o "$ZIP_FILE" || die "Download failed."
+# Resume partial downloads (tunnel networks break mid-transfer) and verify
+# integrity — a corrupt zip triggers exactly one clean re-download.
+download_zip() {
+  curl -fL -C - --retry 3 --retry-delay 2 --progress-bar "$ASSET_URL" -o "$ZIP_FILE"
+}
+download_zip || download_zip || die "Download failed twice. Check your connection and retry."
+if ! unzip -t "$ZIP_FILE" >/dev/null 2>&1; then
+  warn "Archive looks corrupted — re-downloading once..."
+  rm -f "$ZIP_FILE"
+  curl -fL --progress-bar "$ASSET_URL" -o "$ZIP_FILE" || die "Download failed again."
+  unzip -t "$ZIP_FILE" >/dev/null 2>&1 || die "Archive is still corrupted. Please retry later."
+fi
 
 # ---------------------------------------------------------------
 # 7. Install (zip = Termux prefix layout)

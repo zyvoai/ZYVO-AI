@@ -60,6 +60,17 @@ upstream's installers while the zyvo-branded desktop builds are worked on:
 npm i -g opencode-ai@latest
 ```
 
+
+## 📱 Device support
+
+| Device | Status |
+|---|---|
+| aarch64 Android 7+ (Termux) — every modern phone | ✅ Supported |
+| Android 7+ via proot-distro (Ubuntu in Termux) | ✅ Works (the aarch64 binary runs inside proot) |
+| 32-bit ARM phones (pre-2016) | ❌ Not possible (Bun is 64-bit only) — use zyvo remotely over SSH |
+| x86_64 emulators / Chromebooks | 🔜 Planned |
+| Windows / macOS / Linux PC | ✅ Via upstream opencode installers |
+
 ## 🔨 How the Android build works
 
 opencode ships as a compiled Bun binary, and Bun has no official Android
