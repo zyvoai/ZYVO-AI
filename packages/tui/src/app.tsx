@@ -141,6 +141,7 @@ export type TuiInput = {
   headers?: RequestInit["headers"]
   events?: EventSource
   pluginHost: TuiPluginHost
+  client?: { call: (method: string, input: unknown) => Promise<any> }
 }
 
 function errorMessage(error: unknown) {
@@ -306,6 +307,7 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
                                                                 <App
                                                                   onSnapshot={input.onSnapshot}
                                                                   pluginHost={input.pluginHost}
+                                                                  client={input.client}
                                                                 />
                                                               </EditorContextProvider>
                                                             </PromptRefProvider>
@@ -348,7 +350,11 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
   })
 })
 
-function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPluginHost }) {
+function App(props: {
+  onSnapshot?: () => Promise<string[]>
+  pluginHost: TuiPluginHost
+  client?: { call: (method: string, input: unknown) => Promise<any> }
+}) {
   const startup = useTuiStartup()
   const tuiConfig = useTuiConfig()
   const route = useRoute()
@@ -622,6 +628,41 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
         slashAliases: ["mo"],
         run: () => {
           dialog.replace(() => <DialogModel />)
+        },
+      },
+      {
+        name: "ui.open",
+        title: "Open Web UI (browser)",
+        category: "General",
+        slashName: "ui",
+        run: async () => {
+          try {
+            if (!props.client) throw new Error("unavailable")
+            const result = (await props.client.call("server", {
+              port: 4096,
+              hostname: "127.0.0.1",
+            })) as { url?: string }
+            const url = result?.url ?? "http://127.0.0.1:4096"
+            let opened = false
+            for (const opener of ["termux-open", "xdg-open"]) {
+              try {
+                const proc = Bun.spawn([opener, url], { stdout: "ignore", stderr: "ignore" })
+                await proc.exited
+                if (proc.exitCode === 0) {
+                  opened = true
+                  break
+                }
+              } catch {}
+            }
+            toast.show({
+              variant: opened ? "success" : "info",
+              message: opened
+                ? `Web UI opened in browser (${url})`
+                : `Web UI running at ${url} — open it in your browser`,
+            })
+          } catch {
+            toast.show({ variant: "error", message: "Could not start the web UI server" })
+          }
         },
       },
       {

@@ -106,6 +106,29 @@ const migrations = await Promise.all(
 )
 console.log(`Loaded ${migrations.length} migrations`)
 
+// Step 2b: Build + embed the web UI (served by the server, used by /ui)
+const appDir = path.resolve(OPENCODE_DIR, "..", "app")
+console.log("Building web UI (packages/app)...")
+await $`bun run --cwd ${appDir} build`
+const appDist = path.join(appDir, "dist")
+const webFiles = (await Array.fromAsync(new Bun.Glob("**/*").scan({ cwd: appDist })))
+  .map((file) => file.replaceAll("\\", "/"))
+  .filter((file) => !file.endsWith(".map"))
+  .sort()
+const webImports = webFiles.map((file, i) => {
+  const spec = path.relative(OPENCODE_DIR, path.join(appDist, file)).replaceAll("\\", "/")
+  return `import file_${i} from ${JSON.stringify(spec.startsWith(".") ? spec : `./${spec}`)} with { type: "file" };`
+})
+const webEntries = webFiles.map((file, i) => `  ${JSON.stringify(file)}: file_${i},`)
+const embeddedWebUI = [
+  "// Auto-generated - embedded web UI for the /ui browser flow",
+  ...webImports,
+  "export default {",
+  ...webEntries,
+  "}",
+].join("\n")
+console.log(`Embedded web UI: ${webFiles.length} files`)
+
 // Step 3: Build with Bun.build() --compile for the HOST platform
 console.log("\n=== Step 3: Bundling OpenCode ===")
 
@@ -150,7 +173,10 @@ const result = await Bun.build({
     outfile: hostBinaryPath,
     execArgv: [`--user-agent=zyvo/${VERSION}`, "--use-system-ca", "--"],
   },
-  entrypoints: ["./src/index.ts", parserWorkerResolved, workerPath],
+  files: {
+    "opencode-web-ui.gen.ts": embeddedWebUI,
+  },
+  entrypoints: ["./src/index.ts", parserWorkerResolved, workerPath, "opencode-web-ui.gen.ts"],
   define: {
     OPENCODE_VERSION: `'${VERSION}'`,
     OPENCODE_MIGRATIONS: JSON.stringify(migrations),

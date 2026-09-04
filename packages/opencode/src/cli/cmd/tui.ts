@@ -195,6 +195,7 @@ export const TuiThreadCommand = cmd({
               const server = await client.call("snapshot", undefined)
               return [tui, server]
             },
+            client,
             config,
             pluginHost: createLegacyTuiPluginHost(),
             directory: cwd,
