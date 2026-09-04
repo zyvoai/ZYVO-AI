@@ -1,6 +1,5 @@
 import { Prompt, type PromptRef } from "../component/prompt"
 import { createEffect, createMemo, createSignal, onMount } from "solid-js"
-import { Logo } from "../component/logo"
 import { useSync } from "../context/sync"
 import { useTheme } from "../context/theme"
 import { TextAttributes } from "@opentui/core"
@@ -8,6 +7,38 @@ import { Toast } from "../ui/toast"
 import { useArgs } from "../context/args"
 import { useRouteData } from "../context/route"
 import { usePromptRef } from "../context/prompt"
+
+const ZYVO_ART = [
+  "████████████████",
+  "          ██████",
+  "      ██████    ",
+  "  ██████        ",
+  "██████          ",
+  "████████████████",
+  "                ",
+  "████      ██████",
+  "████      ██████",
+  "    ██████████  ",
+  "      ██████    ",
+  "      ██████    ",
+  "      ██████    ",
+  "                ",
+  "██      ██",
+  "██      ██",
+  "██      ██",
+  "  ██  ██  ",
+  "  ██  ██  ",
+  "    ██    ",
+  "                ",
+  "  ████████  ",
+  "██        ██",
+  "██        ██",
+  "██        ██",
+  "██        ██",
+  "  ████████  ",
+].join("
+")
+
 import { useLocal } from "../context/local"
 import { usePluginRuntime } from "../plugin/runtime"
 import { useEditorContext } from "../context/editor"
@@ -74,15 +105,15 @@ export function Home() {
     <HomeSessionDestinationProvider>
       <box flexGrow={1} alignItems="center" paddingLeft={2} paddingRight={2}>
         <box flexGrow={1} minHeight={0} />
-        <box height={4} minHeight={0} flexShrink={1} />
+        <box height={7} minHeight={0} flexShrink={1} />
         <box flexShrink={0}>
           <pluginRuntime.Slot name="home_logo" mode="replace">
-            <Logo />
-            <box paddingLeft={1}>
+            <box flexDirection="column" alignItems="center" paddingLeft={1}>
+              <text fg={theme.text}>{ZYVO_ART}</text>
               <text attributes={TextAttributes.Bold} fg={theme.success}>
                 zyvo
               </text>
-              <text fg={theme.textMuted}> — AI coding agent</text>
+              <text fg={theme.textMuted}>— AI coding agent</text>
             </box>
           </pluginRuntime.Slot>
         </box>
