@@ -79,7 +79,7 @@ export function Home() {
           <pluginRuntime.Slot name="home_logo" mode="replace">
             <Logo />
             <box paddingLeft={1}>
-              <text attributes={TextAttributes.Bold} fg={theme().primary}>
+              <text attributes={TextAttributes.Bold} fg={theme().success}>
                 zyvo
               </text>
               <text fg={theme().textMuted}> — AI coding agent</text>
