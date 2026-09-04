@@ -1,6 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "zyvo/auto/best-coding",
+  "model": "zyvo/kc/anthropic/claude-opus-5",
   "provider": {
     "zyvo": {
       "name": "Zyvo",
@@ -10,32 +10,161 @@
         "apiKey": "sk-397a485ebe5ead01-980697-32d3480d"
       },
       "models": {
-        "auto/best-coding": {
-          "name": "Best Coding"
+        "kc/anthropic/claude-opus-5": {
+          "name": "Claude Opus 5"
         },
-        "auto/best-reasoning": {
-          "name": "Best Reasoning"
+        "kc/anthropic/claude-fable-5": {
+          "name": "Claude Fable 5.1"
         },
-        "auto/best-fast": {
-          "name": "Best Fast"
+        "kc/claude-opus-4.8": {
+          "name": "Claude Opus 4.8"
         },
-        "auto/best-chat": {
-          "name": "Best Chat"
+        "kc/openai/gpt-5.6-sol": {
+          "name": "GPT-5.6 Sol Pro"
         },
-        "auto/best-free": {
-          "name": "Best Free"
+        "kc/openai/gpt-5.6-terra": {
+          "name": "GPT-5.6 Terra Pro"
         },
-        "auto/pro-coding": {
-          "name": "Pro Coding"
+        "kc/openai/gpt-5.6-luna": {
+          "name": "GPT-5.6 Luna Pro"
         },
-        "auto/pro-reasoning": {
-          "name": "Pro Reasoning"
+        "kc/openai/gpt-5.5": {
+          "name": "GPT-5.5 Pro"
         },
-        "auto/pro-chat": {
-          "name": "Pro Chat"
+        "kc/openai/gpt-5.4": {
+          "name": "GPT-5.4 Pro"
         },
-        "kc/stepfun/step-3.7-flash:free": {
+        "kc/openai/gpt-5-pro": {
+          "name": "GPT-5 Pro"
+        },
+        "kc/stealth/claude-opus-4.7": {
+          "name": "Claude Opus 4.7"
+        },
+        "kc/stealth/claude-opus-4.6": {
+          "name": "Claude Opus 4.6"
+        },
+        "kc/anthropic/claude-sonnet-5": {
+          "name": "Claude Sonnet 5"
+        },
+        "kc/moonshotai/kimi-k3": {
+          "name": "Kimi K3"
+        },
+        "kc/moonshotai/kimi-k2.7-code": {
+          "name": "Kimi K2.7 Code"
+        },
+        "kc/x-ai/grok-4.6": {
+          "name": "Grok 4.6"
+        },
+        "kc/x-ai/grok-4.5": {
+          "name": "Grok 4.5"
+        },
+        "kc/google/gemini-3.7-flash": {
+          "name": "Gemini 3.7 Flash"
+        },
+        "kc/gemini-3.1-flash-lite-image": {
+          "name": "Gemini 3.1 Pro Preview"
+        },
+        "kc/deepseek/deepseek-v4-pro-0813": {
+          "name": "DeepSeek V4 Pro 0813"
+        },
+        "kc/qwen/qwen3.8-max": {
+          "name": "Qwen3.8 Max"
+        },
+        "kc/qwen/qwen3.8-2.4t-a95b": {
+          "name": "Qwen3.8 2.4T A95B"
+        },
+        "kc/z-ai/glm-5.3": {
+          "name": "GLM 5.3"
+        },
+        "kc/qwen/qwen3.7-max": {
+          "name": "Qwen3.7 Max"
+        },
+        "kc/z-ai/glm-5.2": {
+          "name": "GLM 5.2"
+        },
+        "kc/stealth/claude-sonnet-4.6": {
+          "name": "Claude Sonnet 4.6"
+        },
+        "kc/x-ai/grok-4.20-multi-agent": {
+          "name": "Grok 4.20 Multi-Agent"
+        },
+        "kc/qwen/qwen3-max": {
+          "name": "Qwen3 Max Thinking"
+        },
+        "kc/moonshotai/kimi-k2.6": {
+          "name": "Kimi K2.6"
+        },
+        "kc/moonshotai/kimi-k2.5": {
+          "name": "Kimi K2.5"
+        },
+        "kc/moonshotai/kimi-k2": {
+          "name": "Kimi K2 Thinking"
+        },
+        "kc/z-ai/glm-5.1": {
+          "name": "GLM 5.1"
+        },
+        "kc/openai/gpt-5.3-codex": {
+          "name": "GPT-5.3 Codex"
+        },
+        "kc/openai/gpt-5.2": {
+          "name": "GPT-5.2 Pro"
+        },
+        "kc/qwen/qwen3-coder": {
+          "name": "Qwen3 Coder 480B"
+        },
+        "kc/qwen/qwen3.5-397b-a17b": {
+          "name": "Qwen3.5 397B"
+        },
+        "kc/deepseek/deepseek-r1-0528": {
+          "name": "DeepSeek R1 0528"
+        },
+        "kc/anthropic/claude-opus-4.1": {
+          "name": "Claude Opus 4.1"
+        },
+        "kc/anthropic/claude-sonnet-4.5": {
+          "name": "Claude Sonnet 4.5"
+        },
+        "kc/morph/morph-v3-large": {
+          "name": "Mistral Large 3"
+        },
+        "kc/mistralai/mistral-medium-3-5": {
+          "name": "Mistral Medium 3.5"
+        },
+        "kc/bytedance-seed/seed-2.0-code": {
+          "name": "Seed 2.0 Code"
+        },
+        "kc/xiaomi/mimo-v2.5": {
+          "name": "MiMo V2.5 Pro"
+        },
+        "kc/google/gemini-2.5-pro": {
+          "name": "Gemini 2.5 Pro"
+        },
+        "kc/openai/o3": {
+          "name": "o3 Pro"
+        },
+        "kc/openrouter/free": {
+          "name": "Free Models Router"
+        },
+        "kc/deepseek/deepseek-v4-flash": {
+          "name": "DeepSeek V4 Flash (free)"
+        },
+        "kc/step-3.7-flash": {
           "name": "StepFun: Step 3.7 Flash (free)"
+        },
+        "kc/minimax/minimax-m3": {
+          "name": "MiniMax: MiniMax M3 (free)"
+        },
+        "kc/minimax/minimax-m2.7": {
+          "name": "MiniMax: MiniMax M2.7 (free)"
+        },
+        "kc/google/gemma-4-31b-it": {
+          "name": "Gemma 4 31B (free)"
+        },
+        "kc/poolside/laguna-s-2.1": {
+          "name": "Poolside: Laguna S 2.1 (free)"
+        },
+        "kc/liquid/lfm-2.5-2.6b:free": {
+          "name": "LiquidAI: LFM2.5-2.6B (free)"
         },
         "kc/inclusionai/ling-3.0-flash-fin:free": {
           "name": "Ling 3.0 Flash Fin (free)"
@@ -43,126 +172,17 @@
         "kc/dots-studio/dots-3-note-preview:free": {
           "name": "Dots Studio: Dots3-Note Preview (free)"
         },
-        "kc/liquid/lfm-2.5-2.6b:free": {
-          "name": "LiquidAI: LFM2.5-2.6B (free)"
-        },
-        "kc/nvidia/nemotron-3.5-lightning:free": {
-          "name": "NVIDIA: Nemotron 3.5 Lightning (free)"
-        },
-        "kc/poolside/laguna-s-2.1:free": {
-          "name": "Poolside: Laguna S 2.1 (free)"
-        },
-        "kc/poolside/laguna-xs-2.1:free": {
-          "name": "Poolside: Laguna XS 2.1 (free)"
-        },
         "kc/cohere/north-mini-code:free": {
           "name": "Cohere: North Mini Code (free)"
         },
-        "kc/nvidia/nemotron-3-ultra-550b-a55b:free": {
+        "kc/nemotron-3-ultra-550b-a55b:free": {
           "name": "NVIDIA: Nemotron 3 Ultra (free)"
-        },
-        "kc/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free": {
-          "name": "NVIDIA: Nemotron 3 Nano Omni (free)"
-        },
-        "kc/nvidia/nemotron-3-super-120b-a12b:free": {
-          "name": "NVIDIA: Nemotron 3 Super (free)"
-        },
-        "kc/minimax/minimax-m3:free": {
-          "name": "MiniMax: MiniMax M3 (free)"
-        },
-        "kc/minimax/minimax-m2.7:free": {
-          "name": "MiniMax: MiniMax M2.7 (free)"
-        },
-        "opencode/big-pickle": {
-          "name": "Big Pickle (free)"
-        },
-        "agnes/agnes-2.0-flash": {
-          "name": "Agnes AI: Agnes 2.0 Flash"
-        },
-        "agnes/agnes-2.5-flash": {
-          "name": "Agnes AI: Agnes 2.5 Flash"
-        }
-      }
-    },
-    "omniroute": {
-      "name": "OmniRoute",
-      "npm": "@ai-sdk/openai-compatible",
-      "options": {
-        "baseURL": "https://jaguar-event-lawyer-downloaded.trycloudflare.com/v1",
-        "apiKey": ""
-      },
-      "models": {
-        "auto/best-coding": {
-          "name": "Best Coding"
-        },
-        "auto/best-reasoning": {
-          "name": "Best Reasoning"
-        },
-        "auto/best-fast": {
-          "name": "Best Fast"
-        },
-        "auto/best-chat": {
-          "name": "Best Chat"
         },
         "auto/best-free": {
-          "name": "Best Free"
+          "name": "Auto Free"
         },
-        "auto/pro-coding": {
-          "name": "Pro Coding"
-        },
-        "auto/pro-reasoning": {
-          "name": "Pro Reasoning"
-        },
-        "auto/pro-chat": {
-          "name": "Pro Chat"
-        },
-        "kc/stepfun/step-3.7-flash:free": {
-          "name": "StepFun: Step 3.7 Flash (free)"
-        },
-        "kc/inclusionai/ling-3.0-flash-fin:free": {
-          "name": "Ling 3.0 Flash Fin (free)"
-        },
-        "kc/dots-studio/dots-3-note-preview:free": {
-          "name": "Dots Studio: Dots3-Note Preview (free)"
-        },
-        "kc/liquid/lfm-2.5-2.6b:free": {
-          "name": "LiquidAI: LFM2.5-2.6B (free)"
-        },
-        "kc/nvidia/nemotron-3.5-lightning:free": {
-          "name": "NVIDIA: Nemotron 3.5 Lightning (free)"
-        },
-        "kc/poolside/laguna-s-2.1:free": {
-          "name": "Poolside: Laguna S 2.1 (free)"
-        },
-        "kc/poolside/laguna-xs-2.1:free": {
-          "name": "Poolside: Laguna XS 2.1 (free)"
-        },
-        "kc/cohere/north-mini-code:free": {
-          "name": "Cohere: North Mini Code (free)"
-        },
-        "kc/nvidia/nemotron-3-ultra-550b-a55b:free": {
-          "name": "NVIDIA: Nemotron 3 Ultra (free)"
-        },
-        "kc/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free": {
-          "name": "NVIDIA: Nemotron 3 Nano Omni (free)"
-        },
-        "kc/nvidia/nemotron-3-super-120b-a12b:free": {
-          "name": "NVIDIA: Nemotron 3 Super (free)"
-        },
-        "kc/minimax/minimax-m3:free": {
-          "name": "MiniMax: MiniMax M3 (free)"
-        },
-        "kc/minimax/minimax-m2.7:free": {
-          "name": "MiniMax: MiniMax M2.7 (free)"
-        },
-        "opencode/big-pickle": {
-          "name": "Big Pickle (free)"
-        },
-        "agnes/agnes-2.0-flash": {
-          "name": "Agnes AI: Agnes 2.0 Flash"
-        },
-        "agnes/agnes-2.5-flash": {
-          "name": "Agnes AI: Agnes 2.5 Flash"
+        "kc/kilo-auto/small": {
+          "name": "Auto Small"
         }
       }
     }
