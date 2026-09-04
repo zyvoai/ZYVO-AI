@@ -24,7 +24,7 @@ const placeholder = {
 export function Home() {
   const pluginRuntime = usePluginRuntime()
   const sync = useSync()
-  const theme = useTheme()
+  const theme = useTheme().theme
   const route = useRouteData("home")
   const promptRef = usePromptRef()
   const [ref, setRef] = createSignal<PromptRef | undefined>()
@@ -79,10 +79,10 @@ export function Home() {
           <pluginRuntime.Slot name="home_logo" mode="replace">
             <Logo />
             <box paddingLeft={1}>
-              <text attributes={TextAttributes.Bold} fg={theme().success}>
+              <text attributes={TextAttributes.Bold} fg={theme.success}>
                 zyvo
               </text>
-              <text fg={theme().textMuted}> — AI coding agent</text>
+              <text fg={theme.textMuted}> — AI coding agent</text>
             </box>
           </pluginRuntime.Slot>
         </box>
