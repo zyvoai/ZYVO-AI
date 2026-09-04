@@ -75,6 +75,11 @@ rm -f "$TMP_JSON"
 LATEST_VERSION="$(echo "$RELEASE_JSON" | grep -o '"tag_name": *"[^"]*"' | head -1 | sed 's/.*android-v//; s/"//')"
 [ -n "$LATEST_VERSION" ] || LATEST_VERSION="unknown"
 
+# Build id: changes on EVERY successful build, even when the opencode
+# version string stays the same (UI tweaks, config-driven features etc.)
+REMOTE_BUILD_ID="$(echo "$RELEASE_JSON" | grep -o "\"browser_download_url\": *\"[^\"]*build-id.txt\"" | head -1 | grep -o 'https[^"]*')"
+REMOTE_BUILD_ID="$(curl -fsSL "$REMOTE_BUILD_ID" 2>/dev/null | head -1 || echo unknown)"
+
 # ---------------------------------------------------------------
 # 4. Config refresh function (tiny — always runs)
 # ---------------------------------------------------------------
@@ -106,13 +111,37 @@ if [ -x "$PREFIX/bin/${BINARY_NAME}" ]; then
   INSTALLED_VERSION="$("$PREFIX/bin/${BINARY_NAME}" --version 2>/dev/null | head -1 | tr -d '[:space:]')"
 fi
 
-if [ "$FORCE" = false ] && [ -n "$INSTALLED_VERSION" ] && [ "$INSTALLED_VERSION" = "$LATEST_VERSION" ]; then
-  info "Already up to date (v${LATEST_VERSION})"
+# Always ship the latest wrapper (fixes reach phones without a new release)
+WRAPPER_URL="https://raw.githubusercontent.com/${GITHUB_REPO}/main/android/wrapper.sh"
+mkdir -p "$PREFIX/bin"
+if curl -fsSL "$WRAPPER_URL" -o "$PREFIX/bin/${BINARY_NAME}.new" 2>/dev/null && [ -s "$PREFIX/bin/${BINARY_NAME}.new" ]; then
+  chmod 755 "$PREFIX/bin/${BINARY_NAME}.new"
+  mv "$PREFIX/bin/${BINARY_NAME}.new" "$PREFIX/bin/${BINARY_NAME}"
+fi
+
+LOCAL_BUILD_ID="none"
+[ -f "$PREFIX/libexec/zyvo/build-id" ] && LOCAL_BUILD_ID="$(cat "$PREFIX/libexec/zyvo/build-id" | head -1)"
+
+NEEDS_BINARY=false
+if [ "$FORCE" = true ]; then NEEDS_BINARY=true
+elif [ -z "$INSTALLED_VERSION" ]; then NEEDS_BINARY=true
+elif [ "$INSTALLED_VERSION" != "$LATEST_VERSION" ]; then NEEDS_BINARY=true
+elif [ "$REMOTE_BUILD_ID" != "$LOCAL_BUILD_ID" ]; then NEEDS_BINARY=true
+fi
+
+if [ "$NEEDS_BINARY" = false ]; then
+  info "Already up to date (v${LATEST_VERSION}, build ${LOCAL_BUILD_ID})"
   refresh_config
   echo ""
   echo -e "${GREEN}✔ Config is current — binary untouched (no big download needed).${NC}"
   echo "Start it with:  ${BINARY_NAME}"
   exit 0
+fi
+
+if [ -n "$INSTALLED_VERSION" ]; then
+  info "Update available: v${INSTALLED_VERSION} -> v${LATEST_VERSION} — downloading new build..."
+else
+  info "Fresh install of v${LATEST_VERSION}..."
 fi
 
 if [ -n "$INSTALLED_VERSION" ]; then
@@ -159,6 +188,9 @@ if curl -fsSL "$WRAPPER_URL" -o "$PREFIX/bin/${BINARY_NAME}.new" 2>/dev/null && 
   chmod 755 "$PREFIX/bin/${BINARY_NAME}.new"
   mv "$PREFIX/bin/${BINARY_NAME}.new" "$PREFIX/bin/${BINARY_NAME}"
 fi
+mkdir -p "$PREFIX/libexec/zyvo"
+printf '%s
+' "$REMOTE_BUILD_ID" > "$PREFIX/libexec/zyvo/build-id"
 rm -f "$PREFIX/bin/opencode" 2>/dev/null || true
 rm -rf "$PREFIX/libexec/opencode" 2>/dev/null || true
 rm -rf "$TMP_DIR"

@@ -124,6 +124,14 @@ ar rc "$PKG_DIR/$DEB_NAME" debian-binary control.tar.gz data.tar.gz
 echo "    Created $DEB_NAME"
 
 # ==========================================
+# Build id (lets the installer detect new builds even when the
+# opencode version string is unchanged)
+# ==========================================
+BUILD_ID="ci-$(date +%Y%m%d%H%M%S)-${OPENCODE_VERSION}"
+echo "$BUILD_ID" > "$PKG_DIR/build-id.txt"
+echo "    build id: $BUILD_ID"
+
+# ==========================================
 # Summary
 # ==========================================
 echo ""
