@@ -128,6 +128,7 @@ const embeddedWebUI = [
   "}",
 ].join("\n")
 console.log(`Embedded web UI: ${webFiles.length} files`)
+await Bun.write(path.join(OPENCODE_DIR, "opencode-web-ui.gen.ts"), embeddedWebUI)
 
 // Step 3: Build with Bun.build() --compile for the HOST platform
 console.log("\n=== Step 3: Bundling OpenCode ===")
@@ -173,10 +174,7 @@ const result = await Bun.build({
     outfile: hostBinaryPath,
     execArgv: [`--user-agent=zyvo/${VERSION}`, "--use-system-ca", "--"],
   },
-  files: {
-    "opencode-web-ui.gen.ts": embeddedWebUI,
-  },
-  entrypoints: ["./src/index.ts", parserWorkerResolved, workerPath, "opencode-web-ui.gen.ts"],
+  entrypoints: ["./src/index.ts", parserWorkerResolved, workerPath],
   define: {
     OPENCODE_VERSION: `'${VERSION}'`,
     OPENCODE_MIGRATIONS: JSON.stringify(migrations),

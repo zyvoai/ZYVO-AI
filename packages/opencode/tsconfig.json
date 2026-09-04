@@ -9,6 +9,7 @@
     "noUncheckedIndexedAccess": false,
     "customConditions": ["browser"],
     "paths": {
+      "opencode-web-ui.gen.ts": ["./opencode-web-ui.gen.ts"],
       "@/*": ["./src/*"],
       "@test/*": ["./test/*"]
     }
