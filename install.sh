@@ -83,8 +83,13 @@ info "Latest version: v${LATEST_VERSION}"
 # ---------------------------------------------------------------
 # 4. Full download (resumable + integrity-checked)
 # ---------------------------------------------------------------
-ASSET_URL="$(echo "$RELEASE_JSON" | grep -o "\"browser_download_url\": *\"[^\"]*${ASSET_PATTERN}\"" | head -1 | grep -o 'https[^"]*')"
-[ -n "$ASSET_URL" ] || die "No ${ASSET_PATTERN} asset found in the latest release of ${GITHUB_REPO}."
+ASSET_URL="$(echo "$RELEASE_JSON" | grep -o "\"browser_download_url\": *\"[^\"]*${ASSET_PATTERN}\"" | head -1 | grep -o 'https[^"]*' || true)"
+if [ -z "$ASSET_URL" ]; then
+  warn "No tar.zst asset found - falling back to the zip package"
+  ASSET_PATTERN="android-aarch64.zip"
+  ASSET_URL="$(echo "$RELEASE_JSON" | grep -o "\"browser_download_url\": *\"[^\"]*${ASSET_PATTERN}\"" | head -1 | grep -o 'https[^"]*' || true)"
+fi
+[ -n "$ASSET_URL" ] || die "No package asset found in the latest release of ${GITHUB_REPO}."
 
 info "Downloading: $ASSET_URL"
 TMP_DIR="$(mktemp -d)"
@@ -93,18 +98,25 @@ download_pkg() {
   curl -fL -C - --retry 3 --retry-delay 2 --progress-bar "$ASSET_URL" -o "$ZIP_FILE"
 }
 download_pkg || download_pkg || die "Download failed twice. Check your connection and retry."
-if ! tar --zstd -tf "$ZIP_FILE" >/dev/null 2>&1; then
+if [ "${ASSET_PATTERN##*.}" = "zip" ]; then
+  check_pkg() { unzip -t "$1" >/dev/null 2>&1; }
+  extract_pkg() { unzip -o "$1" -d "$2"; }
+else
+  check_pkg() { tar --zstd -tf "$1" >/dev/null 2>&1; }
+  extract_pkg() { tar --zstd -xf "$1" -C "$2"; }
+fi
+if ! check_pkg "$ZIP_FILE"; then
   warn "Archive looks corrupted — re-downloading once..."
   rm -f "$ZIP_FILE"
   curl -fL --progress-bar "$ASSET_URL" -o "$ZIP_FILE" || die "Download failed again."
-  tar --zstd -tf "$ZIP_FILE" >/dev/null 2>&1 || die "Archive is still corrupted. Please retry later."
+  check_pkg "$ZIP_FILE" || die "Archive is still corrupted. Please retry later."
 fi
 
 # ---------------------------------------------------------------
 # 5. Install (archive = Termux prefix layout)
 # ---------------------------------------------------------------
 info "Installing..."
-tar --zstd -xf "$ZIP_FILE" -C "$TMP_DIR"
+extract_pkg "$ZIP_FILE" "$TMP_DIR"
 USR_DIR="${TMP_DIR}/data/data/com.termux/files/usr"
 [ -f "${USR_DIR}/bin/${BINARY_NAME}" ] || die "Downloaded archive does not contain ${BINARY_NAME}."
 
