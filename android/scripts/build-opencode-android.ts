@@ -130,6 +130,12 @@ const embeddedWebUI = [
 console.log(`Embedded web UI: ${webFiles.length} files`)
 await Bun.write(path.join(OPENCODE_DIR, "opencode-web-ui.gen.ts"), embeddedWebUI)
 
+// zyvo minimal web UI (ChatGPT-style, tiny) - served at /zyvo.html
+const zyvoHtml = await Bun.file(path.join(OPENCODE_DIR, "zyvo-ui.html")).text()
+const zyvoJs = await Bun.file(path.join(OPENCODE_DIR, "zyvo-ui.js")).text()
+embeddedWebUI["zyvo.html"] = zyvoHtml
+embeddedWebUI["zyvo-ui.js"] = zyvoJs
+
 // Step 3: Build with Bun.build() --compile for the HOST platform
 console.log("\n=== Step 3: Bundling OpenCode ===")
 
