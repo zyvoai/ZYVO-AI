@@ -106,38 +106,22 @@ const migrations = await Promise.all(
 )
 console.log(`Loaded ${migrations.length} migrations`)
 
-// Step 2b: Build + embed the web UI (served by the server, used by /ui)
-const appDir = path.resolve(OPENCODE_DIR, "..", "app")
-console.log("Building web UI (packages/app)...")
-await $`bun run --cwd ${appDir} build`
-const appDist = path.join(appDir, "dist")
-const webFiles = (await Array.fromAsync(new Bun.Glob("**/*").scan({ cwd: appDist })))
-  .map((file) => file.replaceAll("\\", "/"))
-  .filter((file) => !file.endsWith(".map"))
-  .sort()
-const webImports = webFiles.map((file, i) => {
-  const spec = path.relative(OPENCODE_DIR, path.join(appDist, file)).replaceAll("\\", "/")
-  return `import file_${i} from ${JSON.stringify(spec.startsWith(".") ? spec : `./${spec}`)} with { type: "file" };`
-})
-const webEntries = webFiles.map((file, i) => `  ${JSON.stringify(file)}: file_${i},`)
+// Step 2b: Embed the zyvo minimal web UI (served at / and /zyvo.html).
+// This replaces the upstream desktop-app bundle entirely: smaller binary,
+// faster build, and a UI that actually works against this server.
 const zyvoHtml = await Bun.file(path.join(OPENCODE_DIR, "zyvo-ui.html")).text()
 const zyvoJs = await Bun.file(path.join(OPENCODE_DIR, "zyvo-ui.js")).text()
-webImports.push(`import zyvoHtml from "./zyvo-ui.html" with { type: "file" };`)
-webImports.push(`import zyvoJs from "./zyvo-ui.js" with { type: "file" };`)
-webEntries.push(`  "zyvo.html": zyvoHtml,`)
-webEntries.push(`  "zyvo-ui.js": zyvoJs,`)
-
 const embeddedWebUI = [
-  "// Auto-generated - embedded web UI for the /ui browser flow",
-  ...webImports,
-  "export default {",
-  ...webEntries,
-  "}",
+  `import zyvoHtml from "./zyvo-ui.html" with { type: "file" };`,
+  `import zyvoJs from "./zyvo-ui.js" with { type: "file" };`,
+  `export default {`,
+  `  "index.html": zyvoHtml,`,
+  `  "zyvo.html": zyvoHtml,`,
+  `  "zyvo-ui.js": zyvoJs,`,
+  `}`,
 ].join("\n")
-console.log(`Embedded web UI: ${webFiles.length} files`)
 await Bun.write(path.join(OPENCODE_DIR, "opencode-web-ui.gen.ts"), embeddedWebUI)
-
-// zyvo minimal web UI (ChatGPT-style, tiny) - served at /zyvo.html
+console.log("Embedded web UI: zyvo chat client (index.html, zyvo.html, zyvo-ui.js)")
 
 // Step 3: Build with Bun.build() --compile for the HOST platform
 console.log("\n=== Step 3: Bundling OpenCode ===")

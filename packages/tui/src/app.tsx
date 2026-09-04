@@ -642,7 +642,7 @@ function App(props: {
               port: 4096,
               hostname: "127.0.0.1",
             })) as { url?: string }
-            const url = (result?.url ?? "http://127.0.0.1:4096") + "/zyvo.html"
+            const url = (result?.url ?? "http://127.0.0.1:4096").replace(/\/+$/, "") + "/zyvo.html"
             let opened = false
             for (const opener of ["termux-open", "xdg-open"]) {
               try {

@@ -66,7 +66,7 @@ export function serveEmbeddedUIEffect(
   fs: FSUtil.Interface,
   embeddedWebUI: Record<string, string>,
 ) {
-  const file = embeddedWebUI[requestPath.replace(/^\//, "")] ?? embeddedWebUI["index.html"] ?? null
+  const file = embeddedWebUI[requestPath.replace(/^\/+/, "")] ?? embeddedWebUI["index.html"] ?? null
   if (!file) return Effect.succeed(notFound())
 
   return fs.readFile(file).pipe(
