@@ -36,8 +36,7 @@ const ZYVO_ART = [
   "██        ██",
   "██        ██",
   "  ████████  ",
-].join("
-")
+].join("\n")
 
 import { useLocal } from "../context/local"
 import { usePluginRuntime } from "../plugin/runtime"
