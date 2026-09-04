@@ -9,33 +9,12 @@ import { useRouteData } from "../context/route"
 import { usePromptRef } from "../context/prompt"
 
 const ZYVO_ART = [
-  "████████████████",
-  "          ██████",
-  "      ██████    ",
-  "  ██████        ",
-  "██████          ",
-  "████████████████",
-  "                ",
-  "████      ██████",
-  "████      ██████",
-  "    ██████████  ",
-  "      ██████    ",
-  "      ██████    ",
-  "      ██████    ",
-  "                ",
-  "██      ██",
-  "██      ██",
-  "██      ██",
-  "  ██  ██  ",
-  "  ██  ██  ",
-  "    ██    ",
-  "                ",
-  "  ████████  ",
-  "██        ██",
-  "██        ██",
-  "██        ██",
-  "██        ██",
-  "  ████████  ",
+  "\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2557\u2588\u2588\u2557   \u2588\u2588\u2557\u2588\u2588\u2557   \u2588\u2588\u2557 \u2588\u2588\u2588\u2588\u2588\u2588\u2557",
+  "\u255a\u2550\u2550\u2588\u2588\u2588\u2554\u255d\u255a\u2588\u2588\u2557 \u2588\u2588\u2554\u255d\u2588\u2588\u2551   \u2588\u2588\u2551\u2588\u2588\u2554\u2550\u2550\u2550\u2588\u2588\u2557",
+  "  \u2588\u2588\u2588\u2554\u255d  \u255a\u2588\u2588\u2588\u2588\u2554\u255d \u2588\u2588\u2551   \u2588\u2588\u2551\u2588\u2588\u2551   \u2588\u2588\u2551",
+  " \u2588\u2588\u2588\u2554\u255d    \u255a\u2588\u2588\u2554\u255d  \u255a\u2588\u2588\u2557 \u2588\u2588\u2554\u255d\u2588\u2588\u2551   \u2588\u2588\u2551",
+  "\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2557   \u2588\u2588\u2551    \u255a\u2588\u2588\u2588\u2588\u2554\u255d \u255a\u2588\u2588\u2588\u2588\u2588\u2588\u2554\u255d",
+  "\u255a\u2550\u2550\u2550\u2550\u2550\u2550\u255d   \u255a\u2550\u255d     \u255a\u2550\u2550\u2550\u255d   \u255a\u2550\u2550\u2550\u2550\u2550\u255d",
 ].join("\n")
 
 import { useLocal } from "../context/local"
@@ -104,7 +83,7 @@ export function Home() {
     <HomeSessionDestinationProvider>
       <box flexGrow={1} alignItems="center" paddingLeft={2} paddingRight={2}>
         <box flexGrow={1} minHeight={0} />
-        <box height={7} minHeight={0} flexShrink={1} />
+        <box height={8} minHeight={0} flexShrink={1} />
         <box flexShrink={0}>
           <pluginRuntime.Slot name="home_logo" mode="replace">
             <box flexDirection="column" alignItems="center" paddingLeft={1}>
