@@ -1,22 +1,16 @@
 #!/data/data/com.termux/files/usr/bin/bash
 #
-# Zyvo installer + smart updater for Termux (Android aarch64)
+# Zyvo installer + updater for Termux (Android aarch64)
 #
 # Usage (in Termux):
 #   curl -fsSL https://raw.githubusercontent.com/zyvoai/ZYVO-AI/main/install.sh | bash
-#   bash install.sh --force          # full reinstall even if up to date
 #
-# Smart update: if the installed version matches the latest release, the
-# ~50MB binary download is SKIPPED — only the tiny model-list config is
-# refreshed. Binary downloads happen only when a new build is released.
+# Always performs a full download and install of the latest release.
+# Model-list/config updates ride along in the same pass.
 
 set -euo pipefail
 
 GITHUB_REPO="${1:-${ZYVO_REPO:-zyvoai/ZYVO-AI}}"
-FORCE=false
-for arg in "$@"; do
-  [ "$arg" = "--force" ] && FORCE=true
-done
 
 BINARY_NAME="zyvo"
 ASSET_PATTERN="android-aarch64.tar.zst"
@@ -55,8 +49,17 @@ if [ ! -d "$HOME/storage/shared" ] && command -v termux-setup-storage >/dev/null
   termux-setup-storage || true
 fi
 
+# Latest wrapper is deployed on every run so wrapper fixes reach phones
+# without a new binary release.
+mkdir -p "$PREFIX/bin"
+WRAPPER_URL="https://raw.githubusercontent.com/${GITHUB_REPO}/main/android/wrapper.sh"
+if curl -fsSL "$WRAPPER_URL" -o "$PREFIX/bin/${BINARY_NAME}.new" 2>/dev/null && [ -s "$PREFIX/bin/${BINARY_NAME}.new" ]; then
+  chmod 755 "$PREFIX/bin/${BINARY_NAME}.new"
+  mv "$PREFIX/bin/${BINARY_NAME}.new" "$PREFIX/bin/${BINARY_NAME}"
+fi
+
 # ---------------------------------------------------------------
-# 3. Latest release info
+# 3. Latest release
 # ---------------------------------------------------------------
 info "Checking the latest release in ${GITHUB_REPO}..."
 API_URL="https://api.github.com/repos/${GITHUB_REPO}/releases/latest"
@@ -65,7 +68,7 @@ HTTP_CODE="$(curl -sSL -o "$TMP_JSON" -w '%{http_code}' "$API_URL" || echo 000)"
 if [ "$HTTP_CODE" = "404" ]; then
   rm -f "$TMP_JSON"
   die "No release published yet in ${GITHUB_REPO}.
-Run the 'Build OpenCode for Android/Termux (aarch64)' workflow first, then retry."
+Run the 'Build Zyvo for Android/Termux (aarch64)' workflow first, then retry."
 elif [ "$HTTP_CODE" != "200" ]; then
   rm -f "$TMP_JSON"
   die "GitHub API returned HTTP $HTTP_CODE. Check your internet connection."
@@ -74,107 +77,31 @@ RELEASE_JSON="$(cat "$TMP_JSON")"
 rm -f "$TMP_JSON"
 
 LATEST_VERSION="$(echo "$RELEASE_JSON" | grep -o '"tag_name": *"[^"]*"' | head -1 | sed 's/.*android-v//; s/"//')"
-[ -n "$LATEST_VERSION" ] || LATEST_VERSION="unknown"
-
-# Build id: changes on EVERY successful build, even when the opencode
-# version string stays the same (UI tweaks, config-driven features etc.)
-REMOTE_BUILD_ID="$(echo "$RELEASE_JSON" | grep -o "\"browser_download_url\": *\"[^\"]*build-id.txt\"" | head -1 | grep -o 'https[^"]*')"
-REMOTE_BUILD_ID="$(curl -fsSL "$REMOTE_BUILD_ID" 2>/dev/null | head -1 || echo unknown)"
+[ -n "$LATEST_VERSION" ] || LATEST_VERSION="latest"
+info "Latest version: v${LATEST_VERSION}"
 
 # ---------------------------------------------------------------
-# 4. Config refresh function (tiny — always runs)
-# ---------------------------------------------------------------
-refresh_config() {
-  CONFIG_DIR="$HOME/.config/zyvo"
-  CONFIG_FILE="$CONFIG_DIR/zyvo.json"
-  CONFIG_URL="https://raw.githubusercontent.com/${GITHUB_REPO}/main/config/zyvo.json"
-  mkdir -p "$CONFIG_DIR"
-  if curl -fsSL "$CONFIG_URL" -o "$CONFIG_FILE.tmp" 2>/dev/null && [ -s "$CONFIG_FILE.tmp" ]; then
-    if [ -f "$CONFIG_FILE" ]; then
-      cp "$CONFIG_FILE" "$CONFIG_FILE.bak"
-    fi
-    mv "$CONFIG_FILE.tmp" "$CONFIG_FILE"
-    info "Model list config refreshed (backup: zyvo.json.bak)"
-  else
-    rm -f "$CONFIG_FILE.tmp"
-    warn "Could not refresh config — keeping what you have"
-  fi
-}
-
-# ---------------------------------------------------------------
-# 5. Smart update check — skip the big download when possible
-# ---------------------------------------------------------------
-CONFIG_DIR="$HOME/.config/zyvo"
-CONFIG_FILE="$CONFIG_DIR/zyvo.json"
-
-INSTALLED_VERSION=""
-if [ -x "$PREFIX/bin/${BINARY_NAME}" ]; then
-  INSTALLED_VERSION="$("$PREFIX/bin/${BINARY_NAME}" --version 2>/dev/null | head -1 | tr -d '[:space:]')"
-fi
-
-# Always ship the latest wrapper (fixes reach phones without a new release)
-WRAPPER_URL="https://raw.githubusercontent.com/${GITHUB_REPO}/main/android/wrapper.sh"
-mkdir -p "$PREFIX/bin"
-if curl -fsSL "$WRAPPER_URL" -o "$PREFIX/bin/${BINARY_NAME}.new" 2>/dev/null && [ -s "$PREFIX/bin/${BINARY_NAME}.new" ]; then
-  chmod 755 "$PREFIX/bin/${BINARY_NAME}.new"
-  mv "$PREFIX/bin/${BINARY_NAME}.new" "$PREFIX/bin/${BINARY_NAME}"
-fi
-
-LOCAL_BUILD_ID="none"
-[ -f "$PREFIX/libexec/zyvo/build-id" ] && LOCAL_BUILD_ID="$(cat "$PREFIX/libexec/zyvo/build-id" | head -1)"
-
-NEEDS_BINARY=false
-if [ "$FORCE" = true ]; then NEEDS_BINARY=true
-elif [ -z "$INSTALLED_VERSION" ]; then NEEDS_BINARY=true
-elif [ "$INSTALLED_VERSION" != "$LATEST_VERSION" ]; then NEEDS_BINARY=true
-elif [ "$REMOTE_BUILD_ID" != "$LOCAL_BUILD_ID" ]; then NEEDS_BINARY=true
-fi
-
-if [ "$NEEDS_BINARY" = false ]; then
-  info "Already up to date (v${LATEST_VERSION}, build ${LOCAL_BUILD_ID})"
-  refresh_config
-  echo ""
-  echo -e "${GREEN}✔ Config is current — binary untouched (no big download needed).${NC}"
-  echo "Start it with:  ${BINARY_NAME}"
-  exit 0
-fi
-
-if [ -n "$INSTALLED_VERSION" ]; then
-  info "Update available: v${INSTALLED_VERSION} -> v${LATEST_VERSION} — downloading new build..."
-else
-  info "Fresh install of v${LATEST_VERSION}..."
-fi
-
-if [ -n "$INSTALLED_VERSION" ]; then
-  info "Update available: v${INSTALLED_VERSION} -> v${LATEST_VERSION} — downloading new build..."
-else
-  info "Fresh install of v${LATEST_VERSION}..."
-fi
-
-# ---------------------------------------------------------------
-# 6. Download the build
+# 4. Full download (resumable + integrity-checked)
 # ---------------------------------------------------------------
 ASSET_URL="$(echo "$RELEASE_JSON" | grep -o "\"browser_download_url\": *\"[^\"]*${ASSET_PATTERN}\"" | head -1 | grep -o 'https[^"]*')"
 [ -n "$ASSET_URL" ] || die "No ${ASSET_PATTERN} asset found in the latest release of ${GITHUB_REPO}."
 
 info "Downloading: $ASSET_URL"
 TMP_DIR="$(mktemp -d)"
-ZIP_FILE="${TMP_DIR}/${BINARY_NAME}.zip"
-# Resume partial downloads (tunnel networks break mid-transfer) and verify
-# integrity — a corrupt zip triggers exactly one clean re-download.
-download_zip() {
+ZIP_FILE="${TMP_DIR}/${BINARY_NAME}.pkg"
+download_pkg() {
   curl -fL -C - --retry 3 --retry-delay 2 --progress-bar "$ASSET_URL" -o "$ZIP_FILE"
 }
-download_zip || download_zip || die "Download failed twice. Check your connection and retry."
-if ! unzip -t "$ZIP_FILE" >/dev/null 2>&1; then
+download_pkg || download_pkg || die "Download failed twice. Check your connection and retry."
+if ! tar --zstd -tf "$ZIP_FILE" >/dev/null 2>&1; then
   warn "Archive looks corrupted — re-downloading once..."
   rm -f "$ZIP_FILE"
   curl -fL --progress-bar "$ASSET_URL" -o "$ZIP_FILE" || die "Download failed again."
-  unzip -t "$ZIP_FILE" >/dev/null 2>&1 || die "Archive is still corrupted. Please retry later."
+  tar --zstd -tf "$ZIP_FILE" >/dev/null 2>&1 || die "Archive is still corrupted. Please retry later."
 fi
 
 # ---------------------------------------------------------------
-# 7. Install (zip = Termux prefix layout)
+# 5. Install (archive = Termux prefix layout)
 # ---------------------------------------------------------------
 info "Installing..."
 tar --zstd -xf "$ZIP_FILE" -C "$TMP_DIR"
@@ -193,25 +120,31 @@ fi
 for so in "${USR_DIR}"/lib/*.so; do
   [ -f "$so" ] && cp "$so" "$PREFIX/lib/"
 done
-# Always ship the latest wrapper from the repo (wrapper fixes reach phones
-# without a full binary release)
-WRAPPER_URL="https://raw.githubusercontent.com/${GITHUB_REPO}/main/android/wrapper.sh"
-if curl -fsSL "$WRAPPER_URL" -o "$PREFIX/bin/${BINARY_NAME}.new" 2>/dev/null && [ -s "$PREFIX/bin/${BINARY_NAME}.new" ]; then
-  chmod 755 "$PREFIX/bin/${BINARY_NAME}.new"
-  mv "$PREFIX/bin/${BINARY_NAME}.new" "$PREFIX/bin/${BINARY_NAME}"
-fi
-mkdir -p "$PREFIX/libexec/zyvo"
-printf '%s
-' "$REMOTE_BUILD_ID" > "$PREFIX/libexec/zyvo/build-id"
 rm -f "$PREFIX/bin/opencode" 2>/dev/null || true
 rm -rf "$PREFIX/libexec/opencode" 2>/dev/null || true
 rm -rf "$TMP_DIR"
 
 # ---------------------------------------------------------------
-# 8. Config + smoke test
+# 6. Config (model list) — refreshed on every run, backup kept
 # ---------------------------------------------------------------
-refresh_config
+CONFIG_DIR="$HOME/.config/zyvo"
+CONFIG_FILE="$CONFIG_DIR/zyvo.json"
+CONFIG_URL="https://raw.githubusercontent.com/${GITHUB_REPO}/main/config/zyvo.json"
+mkdir -p "$CONFIG_DIR"
+if curl -fsSL "$CONFIG_URL" -o "$CONFIG_FILE.tmp" 2>/dev/null && [ -s "$CONFIG_FILE.tmp" ]; then
+  if [ -f "$CONFIG_FILE" ]; then
+    cp "$CONFIG_FILE" "$CONFIG_FILE.bak"
+  fi
+  mv "$CONFIG_FILE.tmp" "$CONFIG_FILE"
+  info "Model list config refreshed (backup: zyvo.json.bak)"
+else
+  rm -f "$CONFIG_FILE.tmp"
+  warn "Could not refresh config — keeping what you have"
+fi
 
+# ---------------------------------------------------------------
+# 7. Smoke test
+# ---------------------------------------------------------------
 info "Verifying installation..."
 if "$PREFIX/bin/${BINARY_NAME}" --version; then
   echo ""
@@ -226,8 +159,6 @@ if "$PREFIX/bin/${BINARY_NAME}" --version; then
   echo ""
   echo "Keep the screen on during long sessions:"
   echo "       termux-wake-lock"
-  echo ""
-  echo "Model-list updates only: re-run this installer — no big download."
 else
   die "Installed binary did not run. Please open an issue with the output of:
   ${BINARY_NAME} --version"
