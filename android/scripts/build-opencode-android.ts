@@ -120,6 +120,13 @@ const webImports = webFiles.map((file, i) => {
   return `import file_${i} from ${JSON.stringify(spec.startsWith(".") ? spec : `./${spec}`)} with { type: "file" };`
 })
 const webEntries = webFiles.map((file, i) => `  ${JSON.stringify(file)}: file_${i},`)
+const zyvoHtml = await Bun.file(path.join(OPENCODE_DIR, "zyvo-ui.html")).text()
+const zyvoJs = await Bun.file(path.join(OPENCODE_DIR, "zyvo-ui.js")).text()
+webImports.push(`import zyvoHtml from "./zyvo-ui.html" with { type: "file" };`)
+webImports.push(`import zyvoJs from "./zyvo-ui.js" with { type: "file" };`)
+webEntries.push(`  "zyvo.html": zyvoHtml,`)
+webEntries.push(`  "zyvo-ui.js": zyvoJs,`)
+
 const embeddedWebUI = [
   "// Auto-generated - embedded web UI for the /ui browser flow",
   ...webImports,
@@ -131,10 +138,6 @@ console.log(`Embedded web UI: ${webFiles.length} files`)
 await Bun.write(path.join(OPENCODE_DIR, "opencode-web-ui.gen.ts"), embeddedWebUI)
 
 // zyvo minimal web UI (ChatGPT-style, tiny) - served at /zyvo.html
-const zyvoHtml = await Bun.file(path.join(OPENCODE_DIR, "zyvo-ui.html")).text()
-const zyvoJs = await Bun.file(path.join(OPENCODE_DIR, "zyvo-ui.js")).text()
-embeddedWebUI["zyvo.html"] = zyvoHtml
-embeddedWebUI["zyvo-ui.js"] = zyvoJs
 
 // Step 3: Build with Bun.build() --compile for the HOST platform
 console.log("\n=== Step 3: Bundling OpenCode ===")
