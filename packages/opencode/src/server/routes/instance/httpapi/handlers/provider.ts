@@ -46,7 +46,16 @@ export const providerHandlers = HttpApiBuilder.group(InstanceHttpApi, "provider"
       for (const [key, value] of Object.entries(all)) {
         if ((enabled ? enabled.has(key) : true) && !disabled.has(key)) filtered[key] = value
       }
-      const connected = yield* provider.list()
+      const rawConnected = yield* provider.list()
+      // zyvo: "connected" must mean "has a usable key" — a config-only
+      // provider with an empty apiKey (a bring-your-own-key entry that hasn't
+      // been filled in yet) must not show the connected checkmark.
+      const connected = Object.fromEntries(
+        Object.entries(rawConnected).filter(([, p]) => {
+          const info = p as { key?: string; options?: { apiKey?: string } }
+          return Boolean(info.key || (info.options?.apiKey && info.options.apiKey.length > 0))
+        }),
+      )
       const providers = Object.assign(
         mapValues(filtered, (item) => Provider.fromModelsDevProvider(item)),
         connected,
