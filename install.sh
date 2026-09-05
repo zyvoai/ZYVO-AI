@@ -107,6 +107,21 @@ deploy_skills() {
   else
     rm -f "$SKILL_DIR/SKILL.md.tmp"
   fi
+
+# ---------------------------------------------------------------
+# 6c. Memory file (AGENTS.md) — deployed ONCE, never overwritten
+#     (auto-loads in every session; the agent maintains it)
+# ---------------------------------------------------------------
+AGENTS_FILE="$HOME/.config/zyvo/AGENTS.md"
+AGENTS_URL="https://raw.githubusercontent.com/${GITHUB_REPO}/main/config/AGENTS.md"
+if [ ! -f "$AGENTS_FILE" ]; then
+  if curl -fsSL "$AGENTS_URL" -o "$AGENTS_FILE.tmp" 2>/dev/null && [ -s "$AGENTS_FILE.tmp" ]; then
+    mv "$AGENTS_FILE.tmp" "$AGENTS_FILE"
+    info "Memory file created — zyvo will remember things across sessions"
+  else
+    rm -f "$AGENTS_FILE.tmp"
+  fi
+fi
 }
 refresh_config() {
   CONFIG_URL="https://raw.githubusercontent.com/${GITHUB_REPO}/main/config/zyvo.json"
