@@ -155,6 +155,20 @@ else
 fi
 
 # ---------------------------------------------------------------
+# 6b. Skills — deploy the apk skill (agent learns to build APKs
+#     via GitHub Actions; zero load on the phone)
+# ---------------------------------------------------------------
+SKILL_DIR="$CONFIG_DIR/skills/apk"
+SKILL_URL="https://raw.githubusercontent.com/${GITHUB_REPO}/main/config/skills/apk/SKILL.md"
+mkdir -p "$SKILL_DIR"
+if curl -fsSL "$SKILL_URL" -o "$SKILL_DIR/SKILL.md.tmp" 2>/dev/null && [ -s "$SKILL_DIR/SKILL.md.tmp" ]; then
+  mv "$SKILL_DIR/SKILL.md.tmp" "$SKILL_DIR/SKILL.md"
+  info "apk skill installed (ask zyvo to build an app!)"
+else
+  rm -f "$SKILL_DIR/SKILL.md.tmp"
+fi
+
+# ---------------------------------------------------------------
 # 7. Smoke test
 # ---------------------------------------------------------------
 info "Verifying installation..."
