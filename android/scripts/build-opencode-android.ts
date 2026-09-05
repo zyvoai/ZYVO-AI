@@ -106,22 +106,13 @@ const migrations = await Promise.all(
 )
 console.log(`Loaded ${migrations.length} migrations`)
 
-// Step 2b: Embed the zyvo minimal web UI (served at / and /zyvo.html).
-// This replaces the upstream desktop-app bundle entirely: smaller binary,
-// faster build, and a UI that actually works against this server.
-const zyvoHtml = await Bun.file(path.join(OPENCODE_DIR, "zyvo-ui.html")).text()
-const zyvoJs = await Bun.file(path.join(OPENCODE_DIR, "zyvo-ui.js")).text()
-const embeddedWebUI = [
-  `import zyvoHtml from "./zyvo-ui.html" with { type: "file" };`,
-  `import zyvoJs from "./zyvo-ui.js" with { type: "file" };`,
-  `export default {`,
-  `  "index.html": zyvoHtml,`,
-  `  "zyvo.html": zyvoHtml,`,
-  `  "zyvo-ui.js": zyvoJs,`,
-  `}`,
-].join("\n")
-await Bun.write(path.join(OPENCODE_DIR, "opencode-web-ui.gen.ts"), embeddedWebUI)
-console.log("Embedded web UI: zyvo chat client (index.html, zyvo.html, zyvo-ui.js)")
+// No embedded web UI in this build: the server answers browser UI
+// requests with 404 (kept as an empty map so the module still resolves).
+await Bun.write(
+  path.join(OPENCODE_DIR, "opencode-web-ui.gen.ts"),
+  "export default {}
+",
+)
 
 // Step 3: Build with Bun.build() --compile for the HOST platform
 console.log("\n=== Step 3: Bundling OpenCode ===")

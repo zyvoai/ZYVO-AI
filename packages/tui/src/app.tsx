@@ -631,41 +631,6 @@ function App(props: {
         },
       },
       {
-        name: "ui.open",
-        title: "Open Web UI (browser)",
-        category: "General",
-        slashName: "ui",
-        run: async () => {
-          try {
-            if (!props.client) throw new Error("unavailable")
-            const result = (await props.client.call("server", {
-              port: 4096,
-              hostname: "127.0.0.1",
-            })) as { url?: string }
-            const url = (result?.url ?? "http://127.0.0.1:4096").replace(/\/+$/, "") + "/zyvo.html"
-            let opened = false
-            for (const opener of ["termux-open", "xdg-open"]) {
-              try {
-                const proc = Bun.spawn([opener, url], { stdout: "ignore", stderr: "ignore" })
-                await proc.exited
-                if (proc.exitCode === 0) {
-                  opened = true
-                  break
-                }
-              } catch {}
-            }
-            toast.show({
-              variant: opened ? "success" : "info",
-              message: opened
-                ? `Web UI opened in browser (${url})`
-                : `Web UI running at ${url} — open it in your browser`,
-            })
-          } catch {
-            toast.show({ variant: "error", message: "Could not start the web UI server" })
-          }
-        },
-      },
-      {
         name: "model.cycle_recent",
         title: "Model cycle",
         category: "Agent",
