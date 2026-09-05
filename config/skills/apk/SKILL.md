@@ -25,9 +25,12 @@ the cloud (free for public repos). The phone only writes text files.
 
 - `git` installed: `pkg install -y git` (skip if present)
 - User has a GitHub account
-- User has a **Personal Access Token** with repo scope:
-  github.com → Settings → Developer settings → Personal access tokens →
-  Tokens (classic) → Generate new token → check `repo` → copy it
+- User has a **Personal Access Token** with repo scope. Give them this
+  DIRECT link (lands on the token-creation page with the `repo` scope
+  already checked):
+  https://github.com/settings/tokens/new?scopes=repo&description=Zyvo%20APK%20builder
+  They scroll down, click "Generate token", and copy it — the token is
+  shown only once, so they must paste it to you immediately.
   (ask the user for it if not provided; store nothing in files)
 - GitHub username known (ask if needed)
 
