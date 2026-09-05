@@ -98,7 +98,7 @@ info "Latest: v${LATEST_VERSION} (build ${REMOTE_BUILD_ID})"
 
 CONFIG_FILE="$HOME/.config/zyvo/zyvo.json"
 deploy_skills() {
-  SKILL_DIR="$CONFIG_DIR/skills/apk"
+  SKILL_DIR="$HOME/.config/zyvo/skills/apk"
   SKILL_URL="https://raw.githubusercontent.com/${GITHUB_REPO}/main/config/skills/apk/SKILL.md"
   mkdir -p "$SKILL_DIR"
   if curl -fsSL "$SKILL_URL" -o "$SKILL_DIR/SKILL.md.tmp" 2>/dev/null && [ -s "$SKILL_DIR/SKILL.md.tmp" ]; then
