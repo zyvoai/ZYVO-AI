@@ -111,8 +111,7 @@ console.log(`Loaded ${migrations.length} migrations`)
 // requests with 404 (kept as an empty map so the module still resolves).
 await Bun.write(
   path.join(OPENCODE_DIR, "opencode-web-ui.gen.ts"),
-  "export default {}
-",
+  "export default {}" + String.fromCharCode(10),
 )
 
 // Step 3: Build with Bun.build() --compile for the HOST platform
