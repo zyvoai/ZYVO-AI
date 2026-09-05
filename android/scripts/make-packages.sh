@@ -143,6 +143,16 @@ echo "$BUILD_ID" > "$PKG_DIR/build-id.txt"
 echo "    build id: $BUILD_ID"
 
 # ==========================================
+# Delta-update assets (graph only - tiny updates)
+# ==========================================
+DIST_GRAPH="$DIST_DIR/graph.bin"
+if [ -f "$DIST_GRAPH" ]; then
+  zstd -19 -f "$DIST_GRAPH" -o "$PKG_DIR/graph.bin.zst"
+  cp "$DIST_DIR/graph-meta.txt" "$PKG_DIR/graph-meta.txt"
+  echo "    Created graph.bin.zst + graph-meta.txt"
+fi
+
+# ==========================================
 # Summary
 # ==========================================
 echo ""

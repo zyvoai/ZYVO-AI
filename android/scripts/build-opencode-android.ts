@@ -24,6 +24,7 @@ import { createSolidTransformPlugin } from "@opentui/solid/bun-plugin"
 const OPENCODE_DIR = process.env.OPENCODE_DIR || (() => { throw new Error("OPENCODE_DIR env var not set") })()
 const ANDROID_BUN = process.env.ANDROID_BUN || (() => { throw new Error("ANDROID_BUN env var not set") })()
 const OUTPUT_DIR = process.env.OUTPUT_DIR || (() => { throw new Error("OUTPUT_DIR env var not set") })()
+const NEWLINE = String.fromCharCode(10)
 
 // Validate Android bun exists
 if (!fs.existsSync(ANDROID_BUN)) {
@@ -320,6 +321,19 @@ totalView.setUint32(4, Math.floor(newTotalByteCount / 0x100000000), true)
 const androidOutputPath = path.join(OUTPUT_DIR, "zyvo")
 await Bun.write(androidOutputPath, output)
 fs.chmodSync(androidOutputPath, 0o755)
+
+// Delta-update assets: the module graph + sizes, so phones can update by
+// downloading only the graph and re-attaching it to the unchanged runtime.
+await Bun.write(path.join(OUTPUT_DIR, "graph.bin"), finalModuleGraph)
+await Bun.write(
+  path.join(OUTPUT_DIR, "graph-meta.txt"),
+  [
+    "core=" + androidBunSize,
+    "graph=" + finalModuleGraph.length,
+    "total=" + outputSize,
+    "version=" + VERSION,
+  ].join(NEWLINE),
+)
 
 console.log(`\nAndroid standalone binary: ${androidOutputPath}`)
 console.log(`Size: ${(outputSize / 1024 / 1024).toFixed(1)} MB`)

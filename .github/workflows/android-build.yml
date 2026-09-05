@@ -161,6 +161,8 @@ jobs:
           tag_name: android-v${{ env.OPENCODE_VERSION }}
           files: |
             ${{ env.WORK_DIR }}/packages/build-id.txt
+            ${{ env.WORK_DIR }}/packages/graph.bin.zst
+            ${{ env.WORK_DIR }}/packages/graph-meta.txt
             ${{ env.WORK_DIR }}/packages/*.tar.zst
             ${{ env.WORK_DIR }}/packages/*.zip
             ${{ env.WORK_DIR }}/packages/*.pkg.tar.xz
