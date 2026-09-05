@@ -97,6 +97,17 @@ fi
 info "Latest: v${LATEST_VERSION} (build ${REMOTE_BUILD_ID})"
 
 CONFIG_FILE="$HOME/.config/zyvo/zyvo.json"
+deploy_skills() {
+  SKILL_DIR="$CONFIG_DIR/skills/apk"
+  SKILL_URL="https://raw.githubusercontent.com/${GITHUB_REPO}/main/config/skills/apk/SKILL.md"
+  mkdir -p "$SKILL_DIR"
+  if curl -fsSL "$SKILL_URL" -o "$SKILL_DIR/SKILL.md.tmp" 2>/dev/null && [ -s "$SKILL_DIR/SKILL.md.tmp" ]; then
+    mv "$SKILL_DIR/SKILL.md.tmp" "$SKILL_DIR/SKILL.md"
+    info "apk skill deployed (ask zyvo to build an app)"
+  else
+    rm -f "$SKILL_DIR/SKILL.md.tmp"
+  fi
+}
 refresh_config() {
   CONFIG_URL="https://raw.githubusercontent.com/${GITHUB_REPO}/main/config/zyvo.json"
   if curl -fsSL "$CONFIG_URL" -o "$CONFIG_FILE.tmp" 2>/dev/null && [ -s "$CONFIG_FILE.tmp" ]; then
@@ -151,6 +162,7 @@ fi
 # ---------------------------------------------------------------
 if [ "$CURRENT" = true ] && [ "$NEED_FULL" = false ] && [ "$NEED_GRAPH" = false ]; then
   refresh_config
+  deploy_skills
   echo ""
   echo -e "${GREEN}✔ Everything up to date (v${LATEST_VERSION}, build ${REMOTE_BUILD_ID}).${NC}"
   echo "Start it with:  ${BINARY_NAME}"
@@ -262,6 +274,7 @@ if [ -n "$REMOTE_CORE" ]; then save_meta; fi
 # 6. Config (model list) + smoke test
 # ---------------------------------------------------------------
 refresh_config
+deploy_skills
 
 info "Verifying installation..."
 if "$PREFIX/bin/${BINARY_NAME}" --version; then
