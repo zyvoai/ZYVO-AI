@@ -40,8 +40,8 @@ TOOLCHAIN_TMP="$WORK_DIR/webkit-android-toolchain.cmake"
 sed \
     -e "s|/home/guy/Android/Sdk/ndk/28.1.13356709|${ANDROID_NDK_HOME}|g" \
     -e "s|/home/guy/opencode-termux/deps-android/prefix|${DEPS_PREFIX}|g" \
-    -e "s|set(ANDROID_TRIPLE \\"aarch64-linux-android\\")|set(ANDROID_TRIPLE \\"${ANDROID_TRIPLE}\\")|" \
-    -e "s|set(CMAKE_SYSTEM_PROCESSOR aarch64)|set(CMAKE_SYSTEM_PROCESSOR ${ANDROID_ARCH})|" \
+    -e "s|aarch64-linux-android|${ANDROID_TRIPLE}|g" \
+    -e "s|CMAKE_SYSTEM_PROCESSOR aarch64|CMAKE_SYSTEM_PROCESSOR ${ANDROID_ARCH}|" \
     "$TOOLCHAIN" > "$TOOLCHAIN_TMP"
 
 # Create build directory
